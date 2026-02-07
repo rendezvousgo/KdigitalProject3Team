@@ -56,7 +56,7 @@
 ### 1. 클론 및 의존성 설치
 ```bash
 git clone https://github.com/rendezvousgo/KdigitalProject3Team.git
-cd KdigitalProject3Team/KProject/gps
+cd KdigitalProject3Team/gps
 npm install
 ```
 
@@ -64,7 +64,7 @@ npm install
 
 **방법 A — `keys.js` 직접 수정 (간편)**
 
-[KProject/gps/src/config/keys.js](KProject/gps/src/config/keys.js) 파일을 열어 키값을 본인 것으로 교체:
+[gps/src/config/keys.js](gps/src/config/keys.js) 파일을 열어 키값을 본인 것으로 교체:
 
 ```javascript
 export const KAKAO_JS_KEY = '본인_카카오_JavaScript_키';
@@ -75,7 +75,7 @@ export const PARKING_API_KEY = '본인_공공데이터_주차장_API_키';
 
 **방법 B — KNSDK Native 키 변경** (내비게이션 사용 시)
 
-[KProject/gps/android/app/src/main/java/com/triceratops/safeparking/KNSDKModule.kt](KProject/gps/android/app/src/main/java/com/triceratops/safeparking/KNSDKModule.kt)에서:
+[gps/android/app/src/main/java/com/triceratops/safeparking/KNSDKModule.kt](gps/android/app/src/main/java/com/triceratops/safeparking/KNSDKModule.kt)에서:
 
 ```kotlin
 const val KAKAO_NATIVE_APP_KEY = "본인_카카오_Native_앱_키"
