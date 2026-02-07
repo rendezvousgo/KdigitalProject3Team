@@ -1,0 +1,10 @@
+{
+  "id": 202,
+  "title": "파일에서 읽어온 게시글",
+  "content": "파일 읽기 파싱 실습 중입니다.",
+  "tags": ["Java", "FileSystem", "Jackson"],
+  "stats": {
+    "views": 1500,
+    "likes": 45
+  }
+}
