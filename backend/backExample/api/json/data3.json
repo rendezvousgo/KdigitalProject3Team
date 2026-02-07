@@ -1,0 +1,17 @@
+{
+  "id": 101,
+  "title": "자바 파싱 마스터",
+  "content": "배열 파싱은 중요합니다.",
+  "comments": [
+    {
+      "commentId": 1,
+      "user": {"name": "개발자A", "level": 5},
+      "text": "좋은 글이네요!"
+    },
+    {
+      "commentId": 2,
+      "user": {"name": "입문자B", "level": 1},
+      "text": "어려워요 ㅠㅠ"
+    }
+  ]
+}
