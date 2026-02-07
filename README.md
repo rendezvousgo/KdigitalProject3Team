@@ -104,33 +104,36 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ## 📁 프로젝트 구조
 
 ```
-SafeParking/
-├── src/
-│   ├── config/
-│   │   └── keys.js              # ⚠️ API 키 설정 (이 파일 수정)
-│   ├── components/
-│   │   ├── KakaoMapNative.js    # Android 카카오맵 (WebView)
-│   │   └── KakaoMapWeb.js       # Web 카카오맵
-│   ├── screens/
-│   │   ├── HomeScreen.js        # 메인 지도 화면
-│   │   ├── SearchScreen.js      # 검색 화면
-│   │   ├── AIAssistantScreen.js # AI 추천
-│   │   └── ProfileScreen.js     # 프로필
-│   ├── navigation/
-│   │   └── AppNavigator.js      # Stack + Tab 네비게이션
-│   └── services/
-│       ├── api.js               # API 호출 (카카오, 공공데이터)
-│       ├── navigation.js        # 카카오내비 연동
-│       ├── knsdkBridge.js       # KNSDK 브릿지
-│       └── eventBus.js          # 화면 간 이벤트 통신
-├── android/
-│   └── app/src/main/java/com/triceratops/safeparking/
-│       ├── KNSDKModule.kt       # KNSDK 네이티브 모듈
-│       ├── KNNaviActivity.kt    # 내비 Activity
-│       └── MainApplication.kt   # KNSDK 초기화
-├── .env.example                 # 환경변수 템플릿
-├── app.config.js                # Expo 설정
-└── package.json
+KdigitalProject3Team/
+├── README.md
+├── backend/
+└── gps/
+    ├── src/
+    │   ├── config/
+    │   │   └── keys.js              # ⚠️ API 키 설정 (이 파일 수정)
+    │   ├── components/
+    │   │   ├── KakaoMapNative.js    # Android 카카오맵 (WebView)
+    │   │   └── KakaoMapWeb.js       # Web 카카오맵
+    │   ├── screens/
+    │   │   ├── HomeScreen.js        # 메인 지도 화면
+    │   │   ├── SearchScreen.js      # 검색 화면
+    │   │   ├── AIAssistantScreen.js # AI 추천
+    │   │   └── ProfileScreen.js     # 프로필
+    │   ├── navigation/
+    │   │   └── AppNavigator.js      # Stack + Tab 네비게이션
+    │   └── services/
+    │       ├── api.js               # API 호출 (카카오, 공공데이터)
+    │       ├── navigation.js        # 카카오내비 연동
+    │       ├── knsdkBridge.js       # KNSDK 브릿지
+    │       └── eventBus.js          # 화면 간 이벤트 통신
+    ├── android/
+    │   └── app/src/main/java/com/triceratops/safeparking/
+    │       ├── KNSDKModule.kt       # KNSDK 네이티브 모듈
+    │       ├── KNNaviActivity.kt    # 내비 Activity
+    │       └── MainApplication.kt   # KNSDK 초기화
+    ├── .env.example                 # 환경변수 템플릿
+    ├── app.config.js                # Expo 설정
+    └── package.json
 ```
 
 ## ⚠️ 주의사항
