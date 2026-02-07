@@ -1,0 +1,15 @@
+{
+  "name": "safeparking-api-tests",
+  "version": "1.0.0",
+  "description": "SafeParking API 테스트",
+  "scripts": {
+    "test:kakao": "node test-kakao-directions.js",
+    "test:parking": "node test-parking-api.js",
+    "test:no-parking": "node test-no-parking-zone.js",
+    "test:all": "node test-kakao-directions.js && node test-parking-api.js && node test-no-parking-zone.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "node-fetch": "^2.7.0"
+  }
+}

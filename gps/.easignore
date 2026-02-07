@@ -1,0 +1,30 @@
+# EAS Build용 ignore 파일
+# .gitignore의 /android 무시를 오버라이드하여 android/ 폴더를 포함시킴
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native build outputs (소스는 포함, 빌드 출력물만 제외)
+android/app/build/
+android/build/
+android/.gradle/
+ios/
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+
+# local env files
+.env*.local
