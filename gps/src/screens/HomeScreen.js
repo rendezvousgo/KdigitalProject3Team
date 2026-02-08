@@ -216,7 +216,13 @@ export default function HomeScreen({ navigation, route }) {
         kakaoMapRef.current.drawRoute(result.path);
       }
     } catch (err) {
-      console.error('경로 미리보기 실패:', err);
+      console.error('경로 미리보기 실패', {
+        message: err?.message,
+        code: err?.code,
+        httpStatus: err?.httpStatus,
+        details: err?.details,
+        requestUrl: err?.requestUrl,
+      });
       if (Platform.OS === 'web') {
         alert('경로를 불러올 수 없습니다.\n카카오 REST API 키를 확인하세요.');
       } else {

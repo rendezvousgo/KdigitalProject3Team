@@ -1,7 +1,0 @@
-{
-  "boardName": "자유게시판",
-  "posts": [
-    {"id": 1, "title": "첫 안부", "author": "김철수"},
-    {"id": 2, "title": "질문있어요", "author": "이영희"}
-  ]
-}

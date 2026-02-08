@@ -1,4 +1,4 @@
-﻿# 🅿️ SafeParking
+# 🅿️ SafeParking
 
 실시간 공영주차장 검색 및 KNSDK 3D 내비게이션을 지원하는 안드로이드 앱입니다.
 
@@ -68,12 +68,21 @@ npm install
 
 ```javascript
 export const KAKAO_JS_KEY = '본인_카카오_JavaScript_키';
-export const KAKAO_REST_API_KEY = '본인_카카오_REST_API_키';
 export const KAKAO_NATIVE_APP_KEY = '본인_카카오_Native_앱_키';
-export const PARKING_API_KEY = '본인_공공데이터_주차장_API_키';
+export const BACKEND_BASE_URL = 'http://localhost:8080';
 ```
 
-**방법 B — KNSDK Native 키 변경** (내비게이션 사용 시)
+**방법 B — backend API 키 설정**
+
+[backend/src/main/resources/application.properties](backend/src/main/resources/application.properties)에 아래 키를 설정:
+
+`properties
+external.kakao.rest-api-key=본인_카카오_REST_API_키
+external.public-data.parking-api-key=본인_공공데이터_주차장_API_키
+external.public-data.no-parking-api-key=본인_공공데이터_주정차금지_API_키
+` 
+
+**방법 C — KNSDK Native 키 변경** (내비게이션 사용 시)
 
 [gps/android/app/src/main/java/com/triceratops/safeparking/KNSDKModule.kt](gps/android/app/src/main/java/com/triceratops/safeparking/KNSDKModule.kt)에서:
 
@@ -99,6 +108,12 @@ cd android
 
 # 디바이스에 설치 (USB 연결 필요)
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+#안드로이드 에뮬레이터로 실행하는 경우
+npm install
+npm run
+#안드로이드 스튜디오끄면 에뮬레이터가 같이 꺼지는 경우
+Setting -> Emulated 검색 후 Launch in the Running Devices tool window 체크 해제
 ```
 
 ## 📁 프로젝트 구조
