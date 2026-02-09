@@ -141,6 +141,56 @@ KdigitalProject3Team/
 - KNSDK 내비게이션을 사용하려면 **카카오 개발자 콘솔에 본인의 키 해시를 반드시 등록**해야 합니다.
 - `debug.keystore`가 다르면 키 해시가 달라져 KNSDK 인증 실패(C103)가 발생합니다.
 - 공공데이터 API는 일일 호출 제한(1,000건)이 있습니다.
+- **레포에 포함된 `debug.keystore`의 키 해시**: `Xo8WBi6jzSxKDVR4drqm84yr9iU=`
+
+## 🔧 트러블슈팅
+
+### npm install 후 expo가 설치되지 않는 경우
+```bash
+# node_modules와 lock 파일 삭제 후 재설치
+rm -rf node_modules package-lock.json
+npm cache clean --force
+npm install
+```
+
+### "export:embed is not an expo command" 오류
+글로벌 레거시 `expo-cli`가 설치되어 있으면 로컬 expo를 가립니다:
+```bash
+# 글로벌 expo-cli 제거 (반드시!)
+npm uninstall -g expo-cli
+npm uninstall -g @expo/cli
+```
+
+### CMake "Permission denied" 오류 (Gradle 빌드 시)
+이전 빌드에서 남은 캐시 파일 충돌:
+```bash
+# reanimated 빌드 캐시 삭제
+rm -rf node_modules/react-native-reanimated/android/.cxx
+rm -rf node_modules/react-native-reanimated/android/build
+# Gradle 데몬 종료 후 재빌드
+cd android && ./gradlew --stop && ./gradlew assembleDebug
+```
+
+### C 드라이브 용량 부족 시 Gradle 빌드 환경변수
+```powershell
+$env:GRADLE_USER_HOME="D:\gradle-home"
+$env:TEMP="D:\build-temp"
+$env:TMP="D:\build-temp"
+$env:GRADLE_OPTS="-Djava.io.tmpdir=D:\build-temp -Xmx1536m"
+```
+
+## 📋 빌드 필수 환경 요약
+
+| 항목 | 버전/설정 |
+|------|-----------|
+| Node.js | 18+ (v20 LTS 권장, v24는 호환성 이슈 가능) |
+| Java | JDK 21 |
+| Android SDK | compileSdk 35, minSdk 26 |
+| NDK | 27.1.12297006 (Android Studio에서 설치) |
+| CMake | 3.22.1 (Android Studio SDK Manager에서 설치) |
+| Gradle | 8.14.3 (gradlew가 자동 다운로드) |
+| Kotlin | 2.1.20 |
+| expo-cli (글로벌) | **설치하면 안 됨** — 로컬 expo만 사용 |
 
 ## 📄 라이선스
 
