@@ -39,11 +39,17 @@
 1. [Kakao Developers](https://developers.kakao.com)에서 애플리케이션 생성
 2. **플랫폼** → Android 추가:
    - 패키지명: `com.triceratops.safeparking`
-   - 키 해시: 본인 `debug.keystore`에서 추출한 값 등록
-3. **키 해시 추출 방법**:
+   - 키 해시: 아래 방법으로 추출한 값을 등록
+3. **키 해시 추출 방법** (레포에 포함된 `debug.keystore` 사용):
    ```bash
-   keytool -exportcert -alias androiddebugkey -keystore ~/.android/debug.keystore -storepass android | openssl dgst -sha1 -binary | openssl base64
+   # Linux / Mac
+   keytool -exportcert -alias androiddebugkey -keystore android/app/debug.keystore -storepass android | openssl dgst -sha1 -binary | openssl base64
+
+   # Windows (PowerShell)
+   keytool -exportcert -alias androiddebugkey -keystore android\app\debug.keystore -storepass android | openssl dgst -sha1 -binary | openssl base64
    ```
+   > 레포에 포함된 keystore의 키 해시: `Xo8WBi6jzSxKDVR4drqm84yr9iU=`
+   > 이 키 해시를 카카오 개발자 콘솔에 등록하면 별도 keystore 없이 바로 사용 가능합니다.
 
 ### 3. 환경 설정
 
@@ -64,7 +70,7 @@ npm install
 
 **방법 A — `keys.js` 직접 수정 (간편)**
 
-[gps/src/config/keys.js](gps/src/config/keys.js) 파일을 열어 키값을 본인 것으로 교체:
+[src/config/keys.js](src/config/keys.js) 파일을 열어 키값을 본인 것으로 교체:
 
 ```javascript
 export const KAKAO_JS_KEY = '본인_카카오_JavaScript_키';
@@ -75,7 +81,7 @@ export const PARKING_API_KEY = '본인_공공데이터_주차장_API_키';
 
 **방법 B — KNSDK Native 키 변경** (내비게이션 사용 시)
 
-[gps/android/app/src/main/java/com/triceratops/safeparking/KNSDKModule.kt](gps/android/app/src/main/java/com/triceratops/safeparking/KNSDKModule.kt)에서:
+[android/app/src/main/java/com/triceratops/safeparking/KNSDKModule.kt](android/app/src/main/java/com/triceratops/safeparking/KNSDKModule.kt)에서:
 
 ```kotlin
 const val KAKAO_NATIVE_APP_KEY = "본인_카카오_Native_앱_키"
@@ -83,22 +89,38 @@ const val KAKAO_NATIVE_APP_KEY = "본인_카카오_Native_앱_키"
 
 ### 3. 빌드 및 실행
 
-```bash
-# Expo prebuild (네이티브 프로젝트 생성)
-npx expo prebuild --platform android --clean
+> ⚠️ `npx expo prebuild`는 **실행하지 마세요**. `android/` 디렉토리가 이미 레포에 포함되어 있으며, KNSDK 네이티브 모듈이 들어있어 prebuild를 실행하면 커스텀 코드가 모두 초기화됩니다.
 
-# JS 번들 생성
+```bash
+# 1. assets 디렉토리 생성 (없을 경우)
+mkdir -p android/app/src/main/assets
+
+# 2. JS 번들 생성
 npx expo export:embed --platform android --dev false \
   --entry-file index.js \
   --bundle-output android/app/src/main/assets/index.android.bundle \
   --assets-dest android/app/src/main/res
 
+# 3. APK 빌드
+cd android
+./gradlew assembleDebug          # Linux / Mac
+.\gradlew.bat assembleDebug      # Windows
+
+# 4. 디바이스에 설치 (USB 디버깅 연결 필요)
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+**Windows PowerShell에서 빌드하는 경우:**
+```powershell
+# assets 디렉토리 생성
+New-Item -ItemType Directory -Path "android\app\src\main\assets" -Force
+
+# JS 번들 생성
+npx expo export:embed --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+
 # APK 빌드
 cd android
-./gradlew assembleDebug
-
-# 디바이스에 설치 (USB 연결 필요)
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+.\gradlew.bat assembleDebug
 ```
 
 ## 📁 프로젝트 구조
