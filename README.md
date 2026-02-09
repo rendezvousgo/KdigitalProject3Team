@@ -217,6 +217,7 @@ $env:GRADLE_OPTS="-Djava.io.tmpdir=D:\build-temp -Xmx1536m"
 ## 📄 라이선스
 
 이 프로젝트는 학습 목적으로 제작되었습니다.
+
     │   │   └── keys.js              # ⚠️ API 키 설정 (이 파일 수정)
     │   ├── components/
     │   │   ├── KakaoMapNative.js    # Android 카카오맵 (WebView)
