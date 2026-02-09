@@ -8,6 +8,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class VoiceParkingGuideServiceImpl implements VoiceParkingGuideService {
 
+    private final PublicParkingApiService publicParkingApiService;
+
+    public VoiceParkingGuideServiceImpl(PublicParkingApiService publicParkingApiService) {
+        this.publicParkingApiService = publicParkingApiService;
+    }
+
     @Override
     public VoiceGuideResponseDto guideToNearestParking(VoiceGuideRequestDto requestDto) {
         String transcript = requestDto.getTranscript() == null ? "" : requestDto.getTranscript();
@@ -20,19 +26,40 @@ public class VoiceParkingGuideServiceImpl implements VoiceParkingGuideService {
             );
         }
 
-        // TODO: 실제 주차장 데이터 소스(DB/외부 API) 조회 후 최단거리 계산 로직으로 교체
-        ParkingCandidateDto nearestParking = new ParkingCandidateDto(
-                "샘플 주차장",
-                requestDto.getUserLatitude(),
-                requestDto.getUserLongitude(),
-                0.0
-        );
+        if (requestDto.getUserLatitude() == null || requestDto.getUserLongitude() == null) {
+            return new VoiceGuideResponseDto(
+                    "INVALID_REQUEST",
+                    "사용자 위치 좌표가 필요합니다.",
+                    null
+            );
+        }
 
-        return new VoiceGuideResponseDto(
-                "PARKING_NAVIGATION",
-                "가장 가까운 주차장으로 안내를 시작합니다.",
-                nearestParking
-        );
+        try {
+            ParkingCandidateDto nearestParking = publicParkingApiService.findNearestParking(
+                    requestDto.getUserLatitude(),
+                    requestDto.getUserLongitude()
+            );
+
+            if (nearestParking == null) {
+                return new VoiceGuideResponseDto(
+                        "NO_PARKING_FOUND",
+                        "주변 주차장 정보를 찾지 못했습니다.",
+                        null
+                );
+            }
+
+            return new VoiceGuideResponseDto(
+                    "PARKING_NAVIGATION",
+                    "가장 가까운 주차장으로 안내를 시작합니다.",
+                    nearestParking
+            );
+        } catch (IllegalStateException e) {
+            return new VoiceGuideResponseDto(
+                    "PARKING_LOOKUP_FAILED",
+                    "공공 API 조회에 실패했습니다. 설정 또는 네트워크를 확인해 주세요.",
+                    null
+            );
+        }
     }
 
     private boolean containsParkingIntent(String transcript) {
