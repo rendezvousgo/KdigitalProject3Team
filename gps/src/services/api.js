@@ -1,6 +1,9 @@
 /**
  * SafeParking API 서비스
  */
+
+//음성시스템
+
 import { KAKAO_REST_API_KEY, PARKING_API_KEY } from '../config/keys';
 
 const KAKAO_API_KEY = KAKAO_REST_API_KEY;
