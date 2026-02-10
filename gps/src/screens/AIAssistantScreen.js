@@ -12,6 +12,7 @@ import {
   Animated,
   Modal,
   Vibration,
+  StatusBar,   // ★ 추가
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
@@ -485,7 +486,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    // paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 10,
+    paddingBottom: 12, // 기존 vertical padding을 아래쪽으로 집중
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',

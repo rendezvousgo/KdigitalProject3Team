@@ -8,7 +8,8 @@ export default function App() {
     <>
       <StatusBar 
         barStyle="dark-content" 
-        backgroundColor="#fff" 
+        backgroundColor="#ffffff" // 상단 바 배경 흰색
+        translucent={false}      // ★ 중요: 콘텐츠가 상단 바 위로 침범하지 않게 설정
       />
       <AppNavigator />
     </>

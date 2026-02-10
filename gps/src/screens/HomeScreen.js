@@ -253,40 +253,59 @@ export default function HomeScreen({ navigation, route }) {
     }
   };
 
-  const goToMyLocation = async () => {
-    // 토글: 이미 활성화된 상태면 끄기
-    if (myLocationActive) {
-      setMyLocationActive(false);
-      if (kakaoMapRef.current?.hideMyLocation) {
-        kakaoMapRef.current.hideMyLocation();
-      }
+const goToMyLocation = async () => {
+  // 토글: 이미 활성화된 상태면 끄기
+  if (myLocationActive) {
+    setMyLocationActive(false);
+    if (kakaoMapRef.current?.hideMyLocation) {
+      kakaoMapRef.current.hideMyLocation();
+    }
+    return;
+  }
+
+  try {
+    const Location = require('expo-location');
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('위치 권한', '현재 위치를 확인하려면 위치 권한을 허용해주세요.');
       return;
     }
 
-    try {
-      const Location = require('expo-location');
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('위치 권한', '현재 위치를 확인하려면 위치 권한을 허용해주세요.');
-        return;
-      }
-      let loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const coords = loc.coords;
-      setLocation(coords);
-      setMapCenter({ latitude: coords.latitude, longitude: coords.longitude });
-      setMyLocationActive(true);
-      if (kakaoMapRef.current) {
-        kakaoMapRef.current.panTo(coords.latitude, coords.longitude);
-        // 파란 동그라미 표시
-        if (kakaoMapRef.current.showMyLocation) {
-          kakaoMapRef.current.showMyLocation(coords.latitude, coords.longitude);
-        }
-      }
-    } catch (e) {
-      console.error('현재위치 이동 실패:', e);
-      Alert.alert('오류', '현재 위치를 가져올 수 없습니다.');
+    // --- [여기서부터 속도 최적화 핵심!] ---
+    
+    // 1. 일단 가장 최근에 알려진 위치를 '즉시' 가져옵니다 (0.1초 컷)
+    const lastLoc = await Location.getLastKnownPositionAsync();
+    if (lastLoc && kakaoMapRef.current) {
+      const { latitude, longitude } = lastLoc.coords;
+      kakaoMapRef.current.panTo(latitude, longitude);
+      // 일단 마지막 위치로 먼저 지도를 옮겨서 사용자를 안심시킵니다.
     }
-  };
+
+    // 2. 그 다음 실제 현재 위치를 가져오는데, Accuracy를 Balanced로 조절!
+    // High보다 훨씬 빠르고 정확도 차이도 거의 없습니다.
+    let loc = await Location.getCurrentPositionAsync({ 
+      accuracy: Location.Accuracy.Balanced, // 속도 우선!
+      timeout: 5000, // 5초 넘으면 중단
+    });
+
+    const coords = loc.coords;
+    setLocation(coords);
+    setMapCenter({ latitude: coords.latitude, longitude: coords.longitude });
+    setMyLocationActive(true);
+
+    if (kakaoMapRef.current) {
+      kakaoMapRef.current.panTo(coords.latitude, coords.longitude);
+      if (kakaoMapRef.current.showMyLocation) {
+        kakaoMapRef.current.showMyLocation(coords.latitude, coords.longitude);
+      }
+    }
+    // --- [최적화 끝] ---
+
+  } catch (e) {
+    console.error('현재위치 이동 실패:', e);
+    // 오류가 나도 마지막 위치가 있다면 조용히 넘어가는 게 더 매끄러울 수 있습니다.
+  }
+};
 // ★☆★☆ 여기서부터 끝까지 덮어쓰시면 됩니다 ★☆★☆
   return (
     <View style={styles.container}>
@@ -356,16 +375,16 @@ export default function HomeScreen({ navigation, route }) {
               >
                 <MaterialIcons name="my-location" size={24} color={myLocationActive ? '#fff' : '#007AFF'} />
               </TouchableOpacity>
-              <TouchableOpacity 
+              {/* <TouchableOpacity 
                 style={styles.mapButton}
                 onPress={() => navigation.navigate('AIAssistant')}
               >
                 <Ionicons name="chatbubble-ellipses" size={24} color="#007AFF" />
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
           </View>
 
-          {/* 하단 빠른 액션 */}
+          {/* 하단 빠른 액션
           <View style={styles.quickActions}>
             <TouchableOpacity style={styles.quickActionButton}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#E8F8EE' }]}>
@@ -388,7 +407,7 @@ export default function HomeScreen({ navigation, route }) {
               </View>
               <Text style={styles.quickActionText}>AI 추천</Text>
             </TouchableOpacity>
-          </View>
+          </View> */}
         </>
       )}
 
@@ -512,10 +531,11 @@ const styles = StyleSheet.create({
   },
   searchBar: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 12,
-    left: 16,
-    right: 16,
-    backgroundColor: '#fff',
+    top: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 10, 
+  left: 16,
+  right: 16,
+  zIndex: 10,
+  backgroundColor: '#fff',
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,

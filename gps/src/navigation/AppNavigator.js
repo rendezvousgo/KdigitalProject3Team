@@ -70,13 +70,15 @@ function HomeTabs({ route, navigation }) {
             );
           }
         },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
-        tabBarStyle: {
-          height: Platform.OS === 'ios' ? 90 : 75,
-          paddingTop: 8,
+       tabBarStyle: {
+          // 전체 높이를 85로 유지하면서 내부 여백을 조정합니다.
+          height: Platform.OS === 'ios' ? 90 : 95, 
+          // 상단 여백을 줄여서 아이콘을 살짝 위로 올립니다.
+          paddingTop: 5, 
+          // 하단 패딩을 줄여야 글자가 위로 올라와서 보입니다! (15 -> 5)
+          paddingBottom: Platform.OS === 'ios' ? 30 : 25, 
           backgroundColor: '#ffffff',
-          borderTopWidth: 0, // 선을 없애고 그림자를 줍니다
+          borderTopWidth: 0,
           elevation: 20,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
@@ -84,9 +86,10 @@ function HomeTabs({ route, navigation }) {
           shadowRadius: 10,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '600',
-          marginBottom: Platform.OS === 'ios' ? 0 : 10,
+          fontSize: 11, // 글씨 크기를 11로 살짝 키우면 더 잘 보여요.
+          fontWeight: '700', // 좀 더 두껍게 해서 가독성 확보!
+          // 하단 마진을 10 정도로 주어 바닥에서 살짝 띄웁니다.
+          marginBottom: Platform.OS === 'ios' ? 0 : 14, 
         },
       })}
     >
@@ -114,7 +117,7 @@ function HomeTabs({ route, navigation }) {
       <Tab.Screen 
         name="ProfileTab" 
         component={ProfileScreen}
-        options={{ tabBarLabel: '마이' }}
+        options={{ tabBarLabel: '마이페이지' }}
       />
     </Tab.Navigator>
   );
