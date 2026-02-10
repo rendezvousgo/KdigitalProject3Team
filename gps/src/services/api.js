@@ -1,11 +1,40 @@
 /**
- * SafeParking API ¼­ºñ½º
+ * SafeParking API ì„œë¹„ìŠ¤
  */
+
+//ìŒì„±ì‹œìŠ¤í…œ
 
 import { KAKAO_REST_API_KEY, PARKING_API_KEY } from '../config/keys';
 
 const KAKAO_API_KEY = KAKAO_REST_API_KEY;
 
+/**
+ * Kakao coord2regioncode: ì¢Œí‘œ -> region_1depth_name
+ */
+export async function getRegion1DepthName(x, y) {
+  const params = new URLSearchParams({ x: String(x), y: String(y) });
+  try {
+    const response = await fetch(
+      `https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?${params}`,
+      {
+        headers: {
+          'Authorization': `KakaoAK ${KAKAO_API_KEY}`,
+        },
+      }
+    );
+    if (!response.ok) throw new Error('ì¢Œí‘œ->í–‰ì •êµ¬ì—­ ë³€í™˜ ì‹¤íŒ¨');
+    const data = await response.json();
+    const doc = data.documents?.[0];
+    return doc?.region_1depth_name || null;
+  } catch (error) {
+    console.error('coord2regioncode API ì˜¤ë¥˜:', error);
+    return null;
+  }
+}
+
+/**
+ * ì¹´ì¹´ì˜¤ ëª¨ë¹Œë¦¬í‹° - ê¸¸ì°¾ê¸°
+ */
 export async function getDirections(origin, destination, options = {}) {
   const params = new URLSearchParams({
     origin: `${origin.lng},${origin.lat}`,
@@ -22,33 +51,36 @@ export async function getDirections(origin, destination, options = {}) {
       `https://apis-navi.kakaomobility.com/v1/directions?${params}`,
       {
         headers: {
-          Authorization: `KakaoAK ${KAKAO_API_KEY}`,
+          'Authorization': `KakaoAK ${KAKAO_API_KEY}`,
           'Content-Type': 'application/json',
         },
       }
     );
 
-    if (!response.ok) throw new Error('±æÃ£±â ½ÇÆĞ');
-
+    if (!response.ok) throw new Error('ê¸¸ì°¾ê¸° ì‹¤íŒ¨');
+    
     const data = await response.json();
     const route = data.routes?.[0];
-
+    
     if (!route || route.result_code !== 0) {
-      throw new Error(route?.result_msg || '°æ·Î¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù');
+      throw new Error(route?.result_msg || 'ê²½ë¡œë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤');
     }
 
     return {
-      distance: route.summary.distance,
-      duration: route.summary.duration,
+      distance: route.summary.distance, // ë¯¸í„°
+      duration: route.summary.duration, // ì´ˆ
       fare: route.summary.fare,
       sections: route.sections,
     };
   } catch (error) {
-    console.error('±æÃ£±â API ¿À·ù:', error);
+    console.error('ê¸¸ì°¾ê¸° API ì˜¤ë¥˜:', error);
     throw error;
   }
 }
 
+/**
+ * ê³µì˜ì£¼ì°¨ì¥ ëª©ë¡ ì¡°íšŒ
+ */
 export async function getParkingLots(region = null, subRegion = null) {
   const params = new URLSearchParams({
     page: 1,
@@ -57,10 +89,10 @@ export async function getParkingLots(region = null, subRegion = null) {
   });
 
   if (region) {
-    params.append('cond[½Ã±º±¸¸í:EQ]', region);
+    params.append('cond[ì§€ì—­êµ¬ë¶„::EQ]', region);
   }
   if (subRegion) {
-    params.append('cond[½Ã±º±¸¸ísub:EQ]', subRegion);
+    params.append('cond[ì§€ì—­êµ¬ë¶„_sub::EQ]', subRegion);
   }
 
   try {
@@ -68,31 +100,37 @@ export async function getParkingLots(region = null, subRegion = null) {
       `https://api.odcloud.kr/api/15050093/v1/uddi:d19c8e21-4445-43fe-b2a6-865dff832e08?${params}`
     );
 
-    if (!response.ok) throw new Error('ÁÖÂ÷Àå Á¶È¸ ½ÇÆĞ');
-
+    if (!response.ok) throw new Error('ì£¼ì°¨ì¥ ì¡°íšŒ ì‹¤íŒ¨');
+    
     const data = await response.json();
-
+    
     return (data.data || []).map(lot => ({
-      id: lot['ÁÖÂ÷Àå°ü¸®¹øÈ£'],
-      name: lot['ÁÖÂ÷Àå¸í'],
-      address: lot['ÁÖÂ÷Àåµµ·Î¸íÁÖ¼Ò'] || lot['ÁÖÂ÷ÀåÁö¹øÁÖ¼Ò'],
-      lat: parseFloat(lot['À§µµ']),
-      lng: parseFloat(lot['°æµµ']),
-      capacity: parseInt(lot['ÁÖÂ÷±¸È¹¼ö']) || 0,
-      fee: lot['¿ä±İÁ¤º¸'],
-      weekdayHours: `${lot['ÆòÀÏ¿î¿µ½ÃÀÛ½Ã°¢'] || '-'} ~ ${lot['ÆòÀÏ¿î¿µÁ¾·á½Ã°¢'] || '-'}`,
-      phone: lot['ÀüÈ­¹øÈ£'],
+      id: lot['ì£¼ì°¨ì¥ê´€ë¦¬ë²ˆí˜¸'],
+      name: lot['ì£¼ì°¨ì¥ëª…'],
+      address: lot['ì£¼ì°¨ì¥ë„ë¡œëª…ì£¼ì†Œ'] || lot['ì£¼ì°¨ì¥ì§€ë²ˆì£¼ì†Œ'],
+      lat: parseFloat(lot['ìœ„ë„']),
+      lng: parseFloat(lot['ê²½ë„']),
+      capacity: parseInt(lot['ì£¼ì°¨êµ¬íšìˆ˜']) || 0,
+      fee: lot['ìš”ê¸ˆì •ë³´'],
+      weekdayHours: `${lot['í‰ì¼ìš´ì˜ì‹œì‘ì‹œê°'] || '?'} ~ ${lot['í‰ì¼ìš´ì˜ì¢…ë£Œì‹œê°'] || '?'}`,
+      phone: lot['ì—°ë½ì²˜'],
     })).filter(lot => !isNaN(lot.lat) && !isNaN(lot.lng));
   } catch (error) {
-    console.error('ÁÖÂ÷Àå API ¿À·ù:', error);
+    console.error('ì£¼ì°¨ì¥ API ì˜¤ë¥˜:', error);
     throw error;
   }
 }
 
+/**
+ * íŠ¹ì • ì¢Œí‘œ ì£¼ë³€ ì£¼ì°¨ì¥ ì°¾ê¸°
+ */
 export async function findNearbyParkingLots(lat, lng, radiusKm = 1) {
   try {
-    const allLots = await getParkingLots('¼­¿ïÆ¯º°½Ã');
-
+    // ì„œìš¸ ë°ì´í„°ë§Œ ê°€ì ¸ì˜¤ê¸° (ì „ì²´ëŠ” ë„ˆë¬´ ë§ìŒ)
+    const region1 = await getRegion1DepthName(lng, lat);
+    cachedRegion1 = region1 || cachedRegion1;
+    const allLots = await getParkingLots(region1 || 'ì„œìš¸íŠ¹ë³„ì‹œ');
+    
     return allLots
       .map(lot => {
         const distance = calculateDistance(lat, lng, lot.lat, lot.lng);
@@ -100,13 +138,16 @@ export async function findNearbyParkingLots(lat, lng, radiusKm = 1) {
       })
       .filter(lot => lot.distance <= radiusKm)
       .sort((a, b) => a.distance - b.distance)
-      .slice(0, 20);
+      .slice(0, 20); // ìµœëŒ€ 20ê°œ
   } catch (error) {
-    console.error('ÁÖº¯ ÁÖÂ÷Àå °Ë»ö ¿À·ù:', error);
+    console.error('ì£¼ë³€ ì£¼ì°¨ì¥ ê²€ìƒ‰ ì˜¤ë¥˜:', error);
     return [];
   }
 }
 
+/**
+ * ì¹´ì¹´ì˜¤ Local í‚¤ì›Œë“œ ê²€ìƒ‰ (ì¥ì†Œ ê²€ìƒ‰)
+ */
 export async function searchPlaces(keyword, lat, lng) {
   const params = new URLSearchParams({
     query: keyword,
@@ -123,12 +164,12 @@ export async function searchPlaces(keyword, lat, lng) {
       `https://dapi.kakao.com/v2/local/search/keyword.json?${params}`,
       {
         headers: {
-          Authorization: `KakaoAK ${KAKAO_API_KEY}`,
+          'Authorization': `KakaoAK ${KAKAO_API_KEY}`,
         },
       }
     );
 
-    if (!response.ok) throw new Error('Àå¼Ò °Ë»ö ½ÇÆĞ');
+    if (!response.ok) throw new Error('ì¥ì†Œ ê²€ìƒ‰ ì‹¤íŒ¨');
     const data = await response.json();
 
     return (data.documents || []).map(doc => ({
@@ -139,20 +180,24 @@ export async function searchPlaces(keyword, lat, lng) {
       lng: parseFloat(doc.x),
       category: doc.category_group_name || '',
       phone: doc.phone || '',
-      distance: doc.distance ? parseInt(doc.distance, 10) : null,
+      distance: doc.distance ? parseInt(doc.distance) : null,
       type: 'place',
     }));
   } catch (error) {
-    console.error('Àå¼Ò °Ë»ö ¿À·ù:', error);
+    console.error('ì¥ì†Œ ê²€ìƒ‰ ì˜¤ë¥˜:', error);
     return [];
   }
 }
 
+/**
+ * ê³µì˜ì£¼ì°¨ì¥ ì´ë¦„/ì£¼ì†Œ í‚¤ì›Œë“œ ê²€ìƒ‰
+ */
 let parkingCache = null;
+let cachedRegion1 = null;
 export async function searchParkingByName(keyword) {
   try {
     if (!parkingCache) {
-      parkingCache = await getParkingLots('¼­¿ïÆ¯º°½Ã');
+      parkingCache = await getParkingLots(cachedRegion1 || 'ì„œìš¸íŠ¹ë³„ì‹œ');
     }
     const kw = keyword.toLowerCase();
     return parkingCache
@@ -160,33 +205,42 @@ export async function searchParkingByName(keyword) {
       .slice(0, 15)
       .map(lot => ({ ...lot, type: 'parking' }));
   } catch (error) {
-    console.error('ÁÖÂ÷Àå °Ë»ö ¿À·ù:', error);
+    console.error('ì£¼ì°¨ì¥ ê²€ìƒ‰ ì˜¤ë¥˜:', error);
     return [];
   }
 }
 
+/**
+ * ë‘ ì¢Œí‘œ ê°„ ê±°ë¦¬ ê³„ì‚° (km)
+ */
 function calculateDistance(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const a = Math.sin(dLat/2) ** 2 + 
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+            Math.sin(dLng/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 function toRad(deg) {
   return deg * Math.PI / 180;
 }
 
+/**
+ * ê±°ë¦¬ í¬ë§·íŒ…
+ */
 export function formatDistance(meters) {
   if (meters < 1000) return `${Math.round(meters)}m`;
   return `${(meters / 1000).toFixed(1)}km`;
 }
 
+/**
+ * ì‹œê°„ í¬ë§·íŒ…
+ */
 export function formatDuration(seconds) {
   const mins = Math.round(seconds / 60);
   const hours = Math.floor(mins / 60);
   const remainMins = mins % 60;
-  return hours > 0 ? `${hours}½Ã°£ ${remainMins}ºĞ` : `${remainMins}ºĞ`;
+  return hours > 0 ? `${hours}ì‹œê°„ ${remainMins}ë¶„` : `${remainMins}ë¶„`;
 }
