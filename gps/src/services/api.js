@@ -86,6 +86,7 @@ export async function getParkingLots(region = null, subRegion = null) {
     page: 1,
     perPage: 1000,
     serviceKey: PARKING_API_KEY,
+    'cond[주차장구분::EQ]': '공영',
   });
 
   if (region) {
@@ -124,7 +125,7 @@ export async function getParkingLots(region = null, subRegion = null) {
 /**
  * 특정 좌표 주변 주차장 찾기
  */
-export async function findNearbyParkingLots(lat, lng, radiusKm = 1) {
+export async function findNearbyParkingLots(lat, lng, radiusKm = 30) {
   try {
     // 서울 데이터만 가져오기 (전체는 너무 많음)
     const region1 = await getRegion1DepthName(lng, lat);
@@ -138,7 +139,7 @@ export async function findNearbyParkingLots(lat, lng, radiusKm = 1) {
       })
       .filter(lot => lot.distance <= radiusKm)
       .sort((a, b) => a.distance - b.distance)
-      .slice(0, 20); // 최대 20개
+      .slice(0, 100); // 최대 20개
   } catch (error) {
     console.error('주변 주차장 검색 오류:', error);
     return [];

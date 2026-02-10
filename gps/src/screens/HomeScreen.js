@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,15 +17,15 @@ import { openKakaoNavi, fetchRoutePath } from '../services/navigation';
 import { initKNSDK, startNavigation as startKNSDKNavi, getKNSDKStatus, getKeyHash } from '../services/knsdkBridge';
 import { on } from '../services/eventBus';
 
-// ?뚮옯?쇰퀎 遺꾧린
+// 플랫폼별 분기
 import KakaoMapWeb from '../components/KakaoMapWeb';
 import KakaoMapNative from '../components/KakaoMapNative';
-// Android ??WebView 湲곕컲 移댁뭅?ㅻ㏊, Web ??吏곸젒 DOM 移댁뭅?ㅻ㏊
+// Android → WebView 기반 카카오맵, Web → 직접 DOM 카카오맵
 const KakaoMap = Platform.OS === 'web' ? KakaoMapWeb : KakaoMapNative;
 
 const { width, height } = Dimensions.get('window');
 
-// 湲곕낯 醫뚰몴 (?쒖슱?쒖껌) - GPS 嫄곕? ???ъ슜
+// 기본 좌표 (서울시청) - GPS 거부 시 사용
 const DEFAULT_LOCATION = { latitude: 37.5665, longitude: 126.9780 };
 
 export default function HomeScreen({ navigation, route }) {
@@ -33,22 +33,21 @@ export default function HomeScreen({ navigation, route }) {
   const [selectedParking, setSelectedParking] = useState(null);
   const [parkings, setParkings] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [routePath, setRoutePath] = useState(null);   // Polyline 寃쎈줈 醫뚰몴
-  const [routeInfo, setRouteInfo] = useState(null);    // { distanceText, durationText }
+  const [routePath, setRoutePath] = useState(null);
+  const [routeInfo, setRouteInfo] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
-  const [is3DMode, setIs3DMode] = useState(false);     // 3D 酉??좉?
+  const [is3DMode, setIs3DMode] = useState(false);
   const mapRef = useRef(null);
   const kakaoMapRef = useRef(null);
   const bottomSheetAnim = useRef(new Animated.Value(0)).current;
   const [mapCenter, setMapCenter] = useState(DEFAULT_LOCATION);
   const [myLocationActive, setMyLocationActive] = useState(false);
 
-  // KNSDK ?곹깭 (?붾㈃???쒖떆?섏뿬 ADB ?놁씠???뺤씤 媛??
-  const [knsdkStatus, setKnsdkStatus] = useState('珥덇린???湲?);
+  const [knsdkStatus, setKnsdkStatus] = useState('초기화 대기');
   const [knsdkReady, setKnsdkReady] = useState(false);
   const [keyHashInfo, setKeyHashInfo] = useState(null);
 
-  // ?꾩튂 沅뚰븳 ??GPS 痍⑤뱷 ??KNSDK 珥덇린??(?쒖꽌 蹂댁옣)
+  // 위치 권한 → GPS 취득 → KNSDK 초기화 (순서 보장)
   useEffect(() => {
     if (Platform.OS === 'web') {
       setLocation(DEFAULT_LOCATION);
@@ -56,7 +55,7 @@ export default function HomeScreen({ navigation, route }) {
     }
     
     (async () => {
-      // 1) ?꾩튂 沅뚰븳 ?붿껌
+      // 1) 위치 권한 요청
       let permGranted = false;
       try {
         const Location = require('expo-location');
@@ -64,15 +63,33 @@ export default function HomeScreen({ navigation, route }) {
         if (status === 'granted') {
           permGranted = true;
           try {
-            let loc = await Location.getCurrentPositionAsync({});
+           let loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced 
+            });
+            
+            const newCoords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+            
+            // 데이터를 넣는 순간 아래 return문의 로딩창이 지도로 바뀝니다.
             setLocation(loc.coords);
-            setMapCenter({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+            setMapCenter(newCoords);
+            setMyLocationActive(true);
+
+            // 지도가 화면에 그려진 직후(약 0.8초 뒤) 카메라를 내 위치로 이동
+            setTimeout(() => {
+              if (kakaoMapRef.current) {
+                kakaoMapRef.current.panTo(newCoords.latitude, newCoords.longitude);
+                if (kakaoMapRef.current.showMyLocation) {
+                  kakaoMapRef.current.showMyLocation(newCoords.latitude, newCoords.longitude);
+                }
+              }
+            }, 800);
+
           } catch (e) {
-            console.log('GPS 痍⑤뱷 ?ㅽ뙣, 湲곕낯 醫뚰몴 ?ъ슜:', e);
-            setLocation(DEFAULT_LOCATION);
+            console.log('GPS 취득 실패:', e);
+            setLocation(DEFAULT_LOCATION); // 실패 시에만 서울시청
           }
         } else {
-          console.log('?꾩튂 沅뚰븳 嫄곕? ???쒖슱?쒖껌 湲곕낯 醫뚰몴 ?ъ슜');
+          console.log('위치 권한 거부');
           setLocation(DEFAULT_LOCATION);
         }
       } catch (e) {
@@ -80,53 +97,46 @@ export default function HomeScreen({ navigation, route }) {
         setLocation(DEFAULT_LOCATION);
       }
 
-      // 2) ?꾩튂 沅뚰븳 ?띾뱷 ??KNSDK 珥덇린??(C302 諛⑹?)
+      // 2) 위치 권한 획득 후 KNSDK 초기화 (C302 방지)
       if (Platform.OS === 'android') {
         if (!permGranted) {
-          setKnsdkStatus('???꾩튂 沅뚰븳 ?꾩슂 (C302)');
+          setKnsdkStatus('❌ 위치 권한 필요 (C302)');
           return;
         }
         
-        // 2-1) ?고??????댁떆 議고쉶 (?붾쾭源낆슜)
-        try {
+        // 2-1) 런타임 키 해시 조회 (디버깅용)
+       try {
           const hashInfo = await getKeyHash();
-          if (hashInfo) {
-            setKeyHashInfo(hashInfo);
-            console.log('?고??????댁떆:', JSON.stringify(hashInfo));
-          }
-        } catch (e) {
-          console.log('???댁떆 議고쉶 ?ㅽ뙣:', e);
-        }
+          if (hashInfo) setKeyHashInfo(hashInfo);
+        } catch (e) {}
         
-        setKnsdkStatus('珥덇린??以?..');
+        setKnsdkStatus('초기화 중...');
         try {
           const result = await initKNSDK();
           if (result.success) {
-            setKnsdkStatus('??SDK 以鍮??꾨즺');
+            setKnsdkStatus('✅ SDK 준비 완료');
             setKnsdkReady(true);
-            console.log('KNSDK 珥덇린???꾨즺');
           } else {
-            setKnsdkStatus(`??${result.error || '珥덇린???ㅽ뙣'}`);
+            setKnsdkStatus(`❌ ${result.error || '초기화 실패'}`);
             setKnsdkReady(false);
-            console.error('KNSDK 珥덇린???ㅽ뙣:', result.error);
           }
         } catch (err) {
-          setKnsdkStatus(`???덉쇅: ${err.message}`);
+          setKnsdkStatus(`❌ 예외: ${err.message}`);
           setKnsdkReady(false);
         }
       }
     })();
   }, []);
 
-  // SearchScreen?먯꽌 紐⑹쟻吏 ?좏깮 ??吏???대룞
+  // SearchScreen에서 목적지 선택 시 지도 이동
   useEffect(() => {
     const dest = route?.params?.destination;
     const ts = route?.params?.timestamp;
     if (dest && dest.lat && dest.lng) {
-      console.log('紐⑹쟻吏 ?섏떊:', dest.name, dest.lat, dest.lng);
+      console.log('목적지 수신:', dest.name, dest.lat, dest.lng);
       const newCenter = { latitude: dest.lat, longitude: dest.lng };
       setMapCenter(newCenter);
-      // ?쎄컙 ?쒕젅?대? 以섏꽌 WebView媛 以鍮꾨맂 ??panTo
+      // 약간 딜레이를 줘서 WebView가 준비된 후 panTo
       setTimeout(() => {
         if (kakaoMapRef.current) {
           kakaoMapRef.current.panTo(dest.lat, dest.lng);
@@ -135,11 +145,11 @@ export default function HomeScreen({ navigation, route }) {
     }
   }, [route?.params?.timestamp]);
 
-  // eventBus: SearchScreen?먯꽌 紐⑹쟻吏 ?좏깮 ??吏곸젒 ?섏떊
+  // eventBus: SearchScreen에서 목적지 선택 시 직접 수신
   useEffect(() => {
     const unsubscribe = on('navigateToDestination', (dest) => {
       if (dest && dest.lat && dest.lng) {
-        console.log('[eventBus] 紐⑹쟻吏 ?섏떊:', dest.name, dest.lat, dest.lng);
+        console.log('[eventBus] 목적지 수신:', dest.name, dest.lat, dest.lng);
         const newCenter = { latitude: dest.lat, longitude: dest.lng };
         setMapCenter(newCenter);
         setTimeout(() => {
@@ -152,7 +162,7 @@ export default function HomeScreen({ navigation, route }) {
     return unsubscribe;
   }, []);
 
-  // ?꾩튂 蹂寃???二쇰? 二쇱감??濡쒕뱶
+  // 위치 변경 시 주변 주차장 로드
   useEffect(() => {
     if (!location) return;
     
@@ -162,12 +172,12 @@ export default function HomeScreen({ navigation, route }) {
         const nearby = await findNearbyParkingLots(
           location.latitude, 
           location.longitude, 
-          2 // 2km 諛섍꼍
+          20 // 2km 반경
         );
         setParkings(nearby);
-        console.log(`二쇰? 二쇱감??${nearby.length}媛?濡쒕뱶??);
+        console.log(`주변 주차장 ${nearby.length}개 로드됨`);
       } catch (error) {
-        console.error('二쇱감??濡쒕뱶 ?ㅽ뙣:', error);
+        console.error('주차장 로드 실패:', error);
       } finally {
         setLoading(false);
       }
@@ -200,7 +210,7 @@ export default function HomeScreen({ navigation, route }) {
     });
   };
 
-  // 寃쎈줈 誘몃━蹂닿린 (吏?꾩뿉 Polyline 洹몃━湲?
+  // 경로 미리보기 (지도에 Polyline 그리기)
   const showRoutePreview = async (parking) => {
     const origin = location || { latitude: 37.5665, longitude: 126.9780 };
     setRouteLoading(true);
@@ -211,170 +221,197 @@ export default function HomeScreen({ navigation, route }) {
       );
       setRoutePath(result.path);
       setRouteInfo({ distanceText: result.distanceText, durationText: result.durationText });
-      // 吏?꾩뿉 寃쎈줈 洹몃━湲?
+      // 지도에 경로 그리기
       if (kakaoMapRef.current && kakaoMapRef.current.drawRoute) {
         kakaoMapRef.current.drawRoute(result.path);
       }
     } catch (err) {
-      console.error('寃쎈줈 誘몃━蹂닿린 ?ㅽ뙣:', err);
+      console.error('경로 미리보기 실패:', err);
       if (Platform.OS === 'web') {
-        alert('寃쎈줈瑜?遺덈윭?????놁뒿?덈떎.\n移댁뭅??REST API ?ㅻ? ?뺤씤?섏꽭??');
+        alert('경로를 불러올 수 없습니다.\n카카오 REST API 키를 확인하세요.');
       } else {
-        Alert.alert('?ㅻ쪟', '寃쎈줈瑜?遺덈윭?????놁뒿?덈떎.');
+        Alert.alert('오류', '경로를 불러올 수 없습니다.');
       }
     } finally {
       setRouteLoading(false);
     }
   };
 
-  // ?대퉬寃뚯씠???쒖옉 (Android: KNSDK 3D / Web: 移댁뭅?ㅻ㏊ ??
+  // 내비게이션 시작 (Android: KNSDK 3D / Web: 카카오맵 웹)
   const startNavigation = async (parking) => {
     try {
-      // ?꾩옱 GPS 醫뚰몴瑜?異쒕컻吏濡??꾨떖
+      // 현재 GPS 좌표를 출발지로 전달
       const startLat = location?.latitude || DEFAULT_LOCATION.latitude;
       const startLng = location?.longitude || DEFAULT_LOCATION.longitude;
       const result = await startKNSDKNavi(
         parking.lat, parking.lng, parking.name,
         startLat, startLng
       );
-      console.log('?대퉬 ?쒖옉:', result.method);
+      console.log('내비 시작:', result.method);
     } catch (err) {
-      console.error('?대퉬 ?쒖옉 ?ㅽ뙣:', err);
+      console.error('내비 시작 실패:', err);
     }
   };
 
-  const goToMyLocation = async () => {
-    // ?좉?: ?대? ?쒖꽦?붾맂 ?곹깭硫??꾧린
-    if (myLocationActive) {
-      setMyLocationActive(false);
-      if (kakaoMapRef.current?.hideMyLocation) {
-        kakaoMapRef.current.hideMyLocation();
-      }
+const goToMyLocation = async () => {
+  // 토글: 이미 활성화된 상태면 끄기
+  if (myLocationActive) {
+    setMyLocationActive(false);
+    if (kakaoMapRef.current?.hideMyLocation) {
+      kakaoMapRef.current.hideMyLocation();
+    }
+    return;
+  }
+
+  try {
+    const Location = require('expo-location');
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('위치 권한', '현재 위치를 확인하려면 위치 권한을 허용해주세요.');
       return;
     }
 
-    try {
-      const Location = require('expo-location');
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('?꾩튂 沅뚰븳', '?꾩옱 ?꾩튂瑜??뺤씤?섎젮硫??꾩튂 沅뚰븳???덉슜?댁＜?몄슂.');
-        return;
-      }
-      let loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const coords = loc.coords;
-      setLocation(coords);
-      setMapCenter({ latitude: coords.latitude, longitude: coords.longitude });
-      setMyLocationActive(true);
-      if (kakaoMapRef.current) {
-        kakaoMapRef.current.panTo(coords.latitude, coords.longitude);
-        // ?뚮? ?숆렇?쇰? ?쒖떆
-        if (kakaoMapRef.current.showMyLocation) {
-          kakaoMapRef.current.showMyLocation(coords.latitude, coords.longitude);
-        }
-      }
-    } catch (e) {
-      console.error('?꾩옱?꾩튂 ?대룞 ?ㅽ뙣:', e);
-      Alert.alert('?ㅻ쪟', '?꾩옱 ?꾩튂瑜?媛?몄삱 ???놁뒿?덈떎.');
+    // --- [여기서부터 속도 최적화 핵심!] ---
+    
+    // 1. 일단 가장 최근에 알려진 위치를 '즉시' 가져옵니다 (0.1초 컷)
+    const lastLoc = await Location.getLastKnownPositionAsync();
+    if (lastLoc && kakaoMapRef.current) {
+      const { latitude, longitude } = lastLoc.coords;
+      kakaoMapRef.current.panTo(latitude, longitude);
+      // 일단 마지막 위치로 먼저 지도를 옮겨서 사용자를 안심시킵니다.
     }
-  };
 
+    // 2. 그 다음 실제 현재 위치를 가져오는데, Accuracy를 Balanced로 조절!
+    // High보다 훨씬 빠르고 정확도 차이도 거의 없습니다.
+    let loc = await Location.getCurrentPositionAsync({ 
+      accuracy: Location.Accuracy.Balanced, // 속도 우선!
+      timeout: 5000, // 5초 넘으면 중단
+    });
+
+    const coords = loc.coords;
+    setLocation(coords);
+    setMapCenter({ latitude: coords.latitude, longitude: coords.longitude });
+    setMyLocationActive(true);
+
+    if (kakaoMapRef.current) {
+      kakaoMapRef.current.panTo(coords.latitude, coords.longitude);
+      if (kakaoMapRef.current.showMyLocation) {
+        kakaoMapRef.current.showMyLocation(coords.latitude, coords.longitude);
+      }
+    }
+    // --- [최적화 끝] ---
+
+  } catch (e) {
+    console.error('현재위치 이동 실패:', e);
+    // 오류가 나도 마지막 위치가 있다면 조용히 넘어가는 게 더 매끄러울 수 있습니다.
+  }
+};
+// ★☆★☆ 여기서부터 끝까지 덮어쓰시면 됩니다 ★☆★☆
   return (
     <View style={styles.container}>
-      {/* 吏???곸뿭 */}
-      <View style={styles.mapArea}>
-        <KakaoMap 
-          ref={kakaoMapRef}
-          center={mapCenter}
-          parkings={parkings}
-          routePath={routePath}
-          is3D={is3DMode}
-          onMarkerClick={showBottomSheet}
-          onMapIdle={async (lat, lng) => {
-            setLoading(true);
-            try {
-              const nearbyParkings = await findNearbyParkingLots(lat, lng, 2);
-              setParkings(nearbyParkings);
-              console.log(`二쇰? 二쇱감??${nearbyParkings.length}媛?寃?됰맖`);
-            } catch (error) {
-              console.error('二쇱감??寃???ㅽ뙣:', error);
-            } finally {
-              setLoading(false);
-            }
-          }}
-        />
-        
-        {/* ?곗륫 ?곷떒 濡쒕뵫 諭껋? */}
-        {loading && (
-          <View style={styles.loadingBadge}>
-            <ActivityIndicator size="small" color="#fff" />
-          </View>
-        )}
-
-      {/* ?곷떒 寃?됰컮 */}
-      <TouchableOpacity 
-        style={styles.searchBar}
-        onPress={() => navigation.navigate('Search', { location })}
-      >
-        <Ionicons name="search" size={20} color="#666" />
-        <Text style={styles.searchText}>紐⑹쟻吏瑜?寃?됲븯?몄슂</Text>
-        <View style={styles.aiButton}>
-          <Text style={styles.aiButtonText}>AI</Text>
+      {/* ★☆ 1. 위치 정보가 없으면 로딩창을 먼저 띄움 (서울시청 노출 방지) ★☆ */}
+      {!location ? (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>내 위치를 확인 중입니다...</Text>
         </View>
-      </TouchableOpacity>
+      ) : (
+        /* ★☆ 2. 위치가 잡히면 지도와 UI를 띄움 ★☆ */
+        <>
+          <View style={styles.mapArea}>
+            <KakaoMap 
+              ref={kakaoMapRef}
+              center={mapCenter} // ★☆ 이제 DEFAULT가 아닌 실제 내 위치가 처음부터 들어감 ★☆
+              parkings={parkings}
+              routePath={routePath}
+              is3D={is3DMode}
+              onMarkerClick={showBottomSheet}
+              onMapIdle={async (lat, lng) => {
+                setLoading(true);
+                try {
+                  const nearbyParkings = await findNearbyParkingLots(lat, lng, 10);
+                  setParkings(nearbyParkings);
+                  console.log(`주변 주차장 ${nearbyParkings.length}개 검색됨`);
+                } catch (error) {
+                  console.error('주차장 검색 실패:', error);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            />
+            
+            {/* 우측 상단 로딩 뱃지 */}
+            {loading && (
+              <View style={styles.loadingBadge}>
+                <ActivityIndicator size="small" color="#fff" />
+              </View>
+            )}
 
-      {/* ?곗륫 踰꾪듉??*/}
-      <View style={styles.rightButtons}>
-        {Platform.OS === 'web' && (
-          <TouchableOpacity
-            style={[styles.mapButton, is3DMode && styles.mapButtonActive]}
-            onPress={() => setIs3DMode(prev => !prev)}
-          >
-            <Text style={[styles.threeDText, is3DMode && styles.threeDTextActive]}>
-              3D
-            </Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={[styles.mapButton, myLocationActive && styles.mapButtonMyLocActive]}
-          onPress={goToMyLocation}
-        >
-          <MaterialIcons name="my-location" size={24} color={myLocationActive ? '#fff' : '#007AFF'} />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.mapButton}
-          onPress={() => navigation.navigate('AIAssistant')}
-        >
-          <Ionicons name="chatbubble-ellipses" size={24} color="#007AFF" />
-        </TouchableOpacity>
-      </View>
-      </View>
+            {/* 상단 검색바 */}
+            <TouchableOpacity 
+              style={styles.searchBar}
+              onPress={() => navigation.navigate('Search', { location })}
+            >
+              <Ionicons name="search" size={20} color="#666" />
+              <Text style={styles.searchText}>목적지를 검색하세요</Text>
+              <View style={styles.aiButton}>
+                <Text style={styles.aiButtonText}>AI</Text>
+              </View>
+            </TouchableOpacity>
 
-      {/* ?섎떒 鍮좊Ⅸ ?≪뀡 */}
-      <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.quickActionButton}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#E8F8EE' }]}>
-            <FontAwesome5 name="parking" size={18} color="#27AE60" />
+            {/* 우측 버튼들 */}
+            <View style={styles.rightButtons}>
+              {Platform.OS === 'web' && (
+                <TouchableOpacity
+                  style={[styles.mapButton, is3DMode && styles.mapButtonActive]}
+                  onPress={() => setIs3DMode(prev => !prev)}
+                >
+                  <Text style={[styles.threeDText, is3DMode && styles.threeDTextActive]}>3D</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.mapButton, myLocationActive && styles.mapButtonMyLocActive]}
+                onPress={goToMyLocation}
+              >
+                <MaterialIcons name="my-location" size={24} color={myLocationActive ? '#fff' : '#007AFF'} />
+              </TouchableOpacity>
+              {/* <TouchableOpacity 
+                style={styles.mapButton}
+                onPress={() => navigation.navigate('AIAssistant')}
+              >
+                <Ionicons name="chatbubble-ellipses" size={24} color="#007AFF" />
+              </TouchableOpacity> */}
+            </View>
           </View>
-          <Text style={styles.quickActionText}>二쇰? 二쇱감??/Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.quickActionButton}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#FDEEEE' }]}>
-            <MaterialIcons name="videocam" size={18} color="#E74C3C" />
-          </View>
-          <Text style={styles.quickActionText}>?⑥냽移대찓??/Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.quickActionButton}
-          onPress={() => navigation.navigate('AIAssistant')}
-        >
-          <View style={[styles.quickActionIcon, { backgroundColor: '#F0F0F8' }]}>
-            <Ionicons name="sparkles" size={18} color="#1A1A2E" />
-          </View>
-          <Text style={styles.quickActionText}>AI 異붿쿇</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* 二쇱감???곸꽭 諛뷀??쒗듃 */}
+          {/* 하단 빠른 액션
+          <View style={styles.quickActions}>
+            <TouchableOpacity style={styles.quickActionButton}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#E8F8EE' }]}>
+                <FontAwesome5 name="parking" size={18} color="#27AE60" />
+              </View>
+              <Text style={styles.quickActionText}>주변 주차장</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickActionButton}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#FDEEEE' }]}>
+                <MaterialIcons name="videocam" size={18} color="#E74C3C" />
+              </View>
+              <Text style={styles.quickActionText}>단속카메라</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.quickActionButton}
+              onPress={() => navigation.navigate('AIAssistant')}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#F0F0F8' }]}>
+                <Ionicons name="sparkles" size={18} color="#1A1A2E" />
+              </View>
+              <Text style={styles.quickActionText}>AI 추천</Text>
+            </TouchableOpacity>
+          </View> */}
+        </>
+      )}
+
+      {/* 주차장 상세 바텀시트 (위치 여부와 상관없이 렌더링되도록 밖으로 뺌) */}
       {selectedParking && (
         <TouchableOpacity 
           style={styles.overlay} 
@@ -401,7 +438,7 @@ export default function HomeScreen({ navigation, route }) {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.parkingName}>{selectedParking.name}</Text>
                     <Text style={styles.parkingAddress}>{selectedParking.address}</Text>
-                    <Text style={styles.parkingPrice}>{selectedParking.fee || '?붽툑?뺣낫 ?놁쓬'}</Text>
+                    <Text style={styles.parkingPrice}>{selectedParking.fee || '요금정보 없음'}</Text>
                   </View>
                   {selectedParking.distance && (
                     <View style={styles.distanceBadge}>
@@ -416,7 +453,7 @@ export default function HomeScreen({ navigation, route }) {
                 <View style={styles.parkingDetails}>
                   <View style={styles.detailRow}>
                     <MaterialIcons name="local-parking" size={18} color="#666" />
-                    <Text style={styles.detailText}>二쇱감援ы쉷: {selectedParking.capacity}?</Text>
+                    <Text style={styles.detailText}>주차구획: {selectedParking.capacity}대</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <MaterialIcons name="access-time" size={18} color="#666" />
@@ -430,7 +467,6 @@ export default function HomeScreen({ navigation, route }) {
                   )}
                 </View>
                 
-                {/* 寃쎈줈 ?뺣낫 ?쒖떆 */}
                 {routeInfo && (
                   <View style={styles.routeInfoBar}>
                     <View style={styles.routeInfoItem}>
@@ -446,7 +482,6 @@ export default function HomeScreen({ navigation, route }) {
                 )}
 
                 <View style={styles.parkingActions}>
-                  {/* 寃쎈줈媛 ?놁쑝硫?'寃쎈줈 蹂닿린', ?덉쑝硫?'?대퉬 ?쒖옉' */}
                   {!routeInfo ? (
                     <TouchableOpacity
                       style={styles.parkingActionButton}
@@ -459,7 +494,7 @@ export default function HomeScreen({ navigation, route }) {
                         <MaterialIcons name="directions" size={24} color="#fff" />
                       )}
                       <Text style={styles.parkingActionText}>
-                        {routeLoading ? '寃쎈줈 寃??以?..' : '寃쎈줈 蹂닿린'}
+                        {routeLoading ? '경로 검색 중...' : '경로 보기'}
                       </Text>
                     </TouchableOpacity>
                   ) : (
@@ -468,12 +503,12 @@ export default function HomeScreen({ navigation, route }) {
                       onPress={() => startNavigation(selectedParking)}
                     >
                       <MaterialIcons name="navigation" size={24} color="#fff" />
-                      <Text style={styles.parkingActionText}>?대퉬 ?쒖옉</Text>
+                      <Text style={styles.parkingActionText}>내비 시작</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity style={[styles.parkingActionButton, styles.secondaryButton]}>
                     <MaterialIcons name="favorite-border" size={24} color="#007AFF" />
-                    <Text style={[styles.parkingActionText, styles.secondaryButtonText]}>利먭꺼李얘린</Text>
+                    <Text style={[styles.parkingActionText, styles.secondaryButtonText]}>즐겨찾기</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -496,10 +531,11 @@ const styles = StyleSheet.create({
   },
   searchBar: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 12,
-    left: 16,
-    right: 16,
-    backgroundColor: '#fff',
+    top: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 10, 
+  left: 16,
+  right: 16,
+  zIndex: 10,
+  backgroundColor: '#fff',
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -816,14 +852,15 @@ const styles = StyleSheet.create({
     color: '#1A1A2E',
   },
   loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: '#ffffff', // 0.9 대신 아예 불투명하게
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 999, // 다른 요소보다 위에 오도록
   },
   loadingText: {
     marginTop: 12,
@@ -847,7 +884,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     zIndex: 100,
   },
-  // ?뱀슜 ?ㅽ???
+  // 웹용 스타일
   mapArea: {
     flex: 1,
     position: 'relative',
@@ -880,7 +917,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
-  // ?? 寃쎈줈 誘몃━蹂닿린 & ?대퉬 ?ㅽ?????
+  // ── 경로 미리보기 & 내비 스타일 ──
   routeInfoBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -910,7 +947,7 @@ const styles = StyleSheet.create({
   naviButton: {
     backgroundColor: '#3366FF',
   },
-  // ?? 3D ?좉? 踰꾪듉 ??
+  // ── 3D 토글 버튼 ──
   mapButtonActive: {
     backgroundColor: '#1A1A2E',
   },
@@ -928,7 +965,7 @@ const styles = StyleSheet.create({
   threeDTextActive: {
     color: '#fff',
   },
-  // ?? KNSDK ?곹깭 ?쒖떆 ??
+  // ── KNSDK 상태 표시 ──
   sdkStatusBar: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 110 : 90,

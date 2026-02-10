@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Image,
+  Platform,    // ★ 추가
+  StatusBar,   // ★ 추가
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 
@@ -141,7 +143,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 15, 
+    paddingBottom: 16,
+    // paddingVertical: 16,
     backgroundColor: '#fff',
   },
   headerTitle: {
