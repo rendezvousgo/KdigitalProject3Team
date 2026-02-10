@@ -9,29 +9,23 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchPostDetail, deletePost } from '../services/communityApi';
-
-const CATEGORIES = [
-  { id: 1, name: '¿⁄¿Ø∞‘Ω√∆«' },
-  { id: 2, name: '¡÷¬˜ ∆¡' },
-  { id: 3, name: 'º”µµ ¡§∫∏' },
-  { id: 4, name: '¡˙πÆ/¥‰∫Ø' },
-];
+import { fetchPostDetail, deletePost, fetchComments, addComment, deleteComment } from '../services/communityApi';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function PostDetailScreen({ route, navigation }) {
   const { postId } = route.params;
+  const { user, isLoggedIn, isAdmin } = useAuth();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const [commentLoading, setCommentLoading] = useState(false);
   const scrollRef = useRef(null);
-
-  const getCategoryName = (postData) => {
-    const id = postData?.category?.id;
-    const found = CATEGORIES.find(c => c.id === id);
-    return found ? found.name : 'πÃ∫–∑˘';
-  };
 
   const loadPost = useCallback(async () => {
     setLoading(true);
@@ -39,38 +33,85 @@ export default function PostDetailScreen({ route, navigation }) {
       const data = await fetchPostDetail(postId);
       setPost(data);
     } catch (e) {
-      Alert.alert('∫“∑Øø¿±‚ Ω«∆–', e.message, [
-        { text: '»Æ¿Œ', onPress: () => navigation.goBack() },
-      ]);
+      Alert.alert('Î∂àÎü¨Ïò§Í∏∞ Ïã§Ìå®', e.message, [{ text: 'ÌôïÏù∏', onPress: () => navigation.goBack() }]);
     } finally {
       setLoading(false);
     }
   }, [postId, navigation]);
 
+  const loadComments = useCallback(async () => {
+    try {
+      const data = await fetchComments(postId);
+      setComments(data);
+    } catch (e) {
+      console.log('ÎåìÍ∏Ä Î∂àÎü¨Ïò§Í∏∞ Ïã§Ìå®:', e.message);
+    }
+  }, [postId]);
+
   useEffect(() => {
     loadPost();
-  }, [loadPost]);
+    loadComments();
+  }, [loadPost, loadComments]);
 
   useFocusEffect(
     useCallback(() => {
       loadPost();
-    }, [loadPost])
+      loadComments();
+    }, [loadPost, loadComments])
   );
 
+  // ÌòÑÏû¨ ÏÇ¨Ïö©ÏûêÍ∞Ä Í∏Ä ÏûëÏÑ±ÏûêÏù∏ÏßÄ ÌôïÏù∏
+  const isPostOwner = isLoggedIn && user && post && (
+    user.username === post.writer || user.nickname === post.writer
+  );
+  const canEditDelete = isPostOwner || isAdmin;
+
   const handleDeletePost = () => {
-    Alert.alert('±€ ªË¡¶', '¡§∏ª ªË¡¶«œΩ√∞⁄Ω¿¥œ±Ó?', [
-      { text: '√Îº“', style: 'cancel' },
+    Alert.alert('Í∏Ä ÏÇ≠Ï†ú', 'Ï†ïÎßê ÏÇ≠Ï†úÌïòÏãúÍ≤†ÏäµÎãàÍπå?', [
+      { text: 'Ï∑®ÏÜå', style: 'cancel' },
       {
-        text: 'ªË¡¶',
-        style: 'destructive',
+        text: 'ÏÇ≠Ï†ú', style: 'destructive',
         onPress: async () => {
           try {
             await deletePost(postId);
-            Alert.alert('ªË¡¶ øœ∑·', '∞‘Ω√±€¿Ã ªË¡¶µ«æ˙Ω¿¥œ¥Ÿ.', [
-              { text: '»Æ¿Œ', onPress: () => navigation.goBack() },
-            ]);
+            Alert.alert('ÏÇ≠Ï†ú ÏôÑÎ£å', 'Í≤åÏãúÍ∏ÄÏù¥ ÏÇ≠Ï†úÎêòÏóàÏäµÎãàÎã§.', [{ text: 'ÌôïÏù∏', onPress: () => navigation.goBack() }]);
           } catch (e) {
-            Alert.alert('ªË¡¶ Ω«∆–', e.message);
+            Alert.alert('ÏÇ≠Ï†ú Ïã§Ìå®', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAddComment = async () => {
+    if (!commentText.trim()) return;
+    if (!isLoggedIn) {
+      Alert.alert('ÏïåÎ¶º', 'ÎåìÍ∏ÄÏùÑ ÏûëÏÑ±ÌïòÎ†§Î©¥ Î°úÍ∑∏Ïù∏Ïù¥ ÌïÑÏöîÌï©ÎãàÎã§.');
+      return;
+    }
+    setCommentLoading(true);
+    try {
+      await addComment(postId, commentText.trim());
+      setCommentText('');
+      await loadComments();
+    } catch (e) {
+      Alert.alert('ÎåìÍ∏Ä ÏûëÏÑ± Ïã§Ìå®', e.message);
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  const handleDeleteComment = (commentId) => {
+    Alert.alert('ÎåìÍ∏Ä ÏÇ≠Ï†ú', 'ÎåìÍ∏ÄÏùÑ ÏÇ≠Ï†úÌïòÏãúÍ≤†ÏäµÎãàÍπå?', [
+      { text: 'Ï∑®ÏÜå', style: 'cancel' },
+      {
+        text: 'ÏÇ≠Ï†ú', style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteComment(postId, commentId);
+            await loadComments();
+          } catch (e) {
+            Alert.alert('ÏÇ≠Ï†ú Ïã§Ìå®', e.message);
           }
         },
       },
@@ -81,13 +122,14 @@ export default function PostDetailScreen({ route, navigation }) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loading}>
-          <Text style={styles.loadingText}>∑Œµ˘ ¡ﬂ...</Text>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Î°úÎî© Ï§ë...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const categoryName = getCategoryName(post);
+  const categoryName = post?.category?.name || 'ÎØ∏Î∂ÑÎ•ò';
   const dateText = post.createDate ? post.createDate.replace('T', ' ').slice(0, 16) : '';
 
   return (
@@ -96,31 +138,25 @@ export default function PostDetailScreen({ route, navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>∞‘Ω√±€</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>Í≤åÏãúÍ∏Ä</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('PostWrite', { editPost: post })}
-            style={styles.headerActionBtn}
-          >
-            <Ionicons name="create-outline" size={22} color="#007AFF" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleDeletePost} style={styles.headerActionBtn}>
-            <Ionicons name="trash-outline" size={22} color="#FF3B30" />
-          </TouchableOpacity>
+          {canEditDelete && (
+            <>
+              <TouchableOpacity onPress={() => navigation.navigate('PostWrite', { editPost: post })} style={styles.headerActionBtn}>
+                <Ionicons name="create-outline" size={22} color="#007AFF" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleDeletePost} style={styles.headerActionBtn}>
+                <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+              </TouchableOpacity>
+            </>
+          )}
+          {!canEditDelete && <View style={{ width: 48 }} />}
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}
-      >
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+        <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Í∏Ä ÎÇ¥Ïö© */}
           <View style={styles.postCard}>
             <View style={styles.categoryBadge}>
               <Text style={styles.categoryText}>{categoryName}</Text>
@@ -129,7 +165,7 @@ export default function PostDetailScreen({ route, navigation }) {
             <View style={styles.metaRow}>
               <View style={styles.metaItem}>
                 <Ionicons name="person-circle-outline" size={18} color="#999" />
-                <Text style={styles.metaText}>{post.writer || '¿Õ∏Ì'}</Text>
+                <Text style={styles.metaText}>{post.writer || 'ÏùµÎ™Ö'}</Text>
               </View>
               {dateText ? (
                 <View style={styles.metaItem}>
@@ -141,121 +177,121 @@ export default function PostDetailScreen({ route, navigation }) {
             <View style={styles.divider} />
             <Text style={styles.postContent}>{post.content}</Text>
           </View>
+
+          {/* ÎåìÍ∏Ä ÏÑπÏÖò */}
+          <View style={styles.commentSection}>
+            <Text style={styles.commentSectionTitle}>
+              ÎåìÍ∏Ä <Text style={{ color: '#007AFF' }}>{comments.length}</Text>
+            </Text>
+
+            {comments.map((c) => {
+              const canDeleteComment = isLoggedIn && user && (user.username === c.writer || isAdmin);
+              return (
+                <View key={c.id} style={styles.commentItem}>
+                  <View style={styles.commentTop}>
+                    <View style={styles.commentAuthor}>
+                      <Ionicons name="person-circle-outline" size={20} color="#999" />
+                      <Text style={styles.commentWriter}>{c.writer || 'ÏùµÎ™Ö'}</Text>
+                    </View>
+                    <View style={styles.commentRight}>
+                      <Text style={styles.commentDate}>
+                        {c.createDate ? c.createDate.replace('T', ' ').slice(0, 16) : ''}
+                      </Text>
+                      {canDeleteComment && (
+                        <TouchableOpacity onPress={() => handleDeleteComment(c.id)} style={styles.commentDeleteBtn}>
+                          <Ionicons name="close-circle" size={18} color="#FF3B30" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={styles.commentContent}>{c.content}</Text>
+                </View>
+              );
+            })}
+
+            {comments.length === 0 && (
+              <Text style={styles.noComments}>ÏïÑÏßÅ ÎåìÍ∏ÄÏù¥ ÏóÜÏäµÎãàÎã§</Text>
+            )}
+          </View>
         </ScrollView>
+
+        {/* ÎåìÍ∏Ä ÏûÖÎ†• */}
+        <View style={styles.commentInputBar}>
+          {isLoggedIn ? (
+            <>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="ÎåìÍ∏ÄÏùÑ ÏûÖÎ†•ÌïòÏÑ∏Ïöî..."
+                placeholderTextColor="#bbb"
+                value={commentText}
+                onChangeText={setCommentText}
+                maxLength={500}
+                multiline
+              />
+              <TouchableOpacity
+                style={[styles.commentSendBtn, (!commentText.trim() || commentLoading) && { opacity: 0.4 }]}
+                onPress={handleAddComment}
+                disabled={!commentText.trim() || commentLoading}
+              >
+                {commentLoading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send" size={18} color="#fff" />}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.loginRequired}>ÎåìÍ∏ÄÏùÑ ÏûëÏÑ±ÌïòÎ†§Î©¥ Î°úÍ∑∏Ïù∏Ïù¥ ÌïÑÏöîÌï©ÎãàÎã§</Text>
+          )}
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#999',
-    fontSize: 15,
-  },
-
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { color: '#999', fontSize: 15, marginTop: 10 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
-  backBtn: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#000',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  headerActionBtn: {
-    padding: 4,
-  },
-
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
+  backBtn: { padding: 4 },
+  headerTitle: { fontSize: 17, fontWeight: '600', color: '#000', flex: 1, textAlign: 'center' },
+  headerActions: { flexDirection: 'row', gap: 12 },
+  headerActionBtn: { padding: 4 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
   postCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#fff', marginHorizontal: 16, marginTop: 12, borderRadius: 16, padding: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
   },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 6,
-    marginBottom: 12,
-    backgroundColor: '#E3F2FD',
+  categoryBadge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, marginBottom: 12, backgroundColor: '#E3F2FD' },
+  categoryText: { fontSize: 12, fontWeight: '600', color: '#007AFF' },
+  postTitle: { fontSize: 20, fontWeight: 'bold', color: '#111', lineHeight: 28, marginBottom: 14 },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 16 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { fontSize: 14, color: '#666', fontWeight: '500' },
+  metaTextLight: { fontSize: 13, color: '#bbb' },
+  divider: { height: 1, backgroundColor: '#f0f0f0', marginBottom: 16 },
+  postContent: { fontSize: 15, color: '#333', lineHeight: 24 },
+
+  /* Comments */
+  commentSection: { marginHorizontal: 16, marginTop: 16, backgroundColor: '#fff', borderRadius: 16, padding: 16 },
+  commentSectionTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 12 },
+  commentItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
+  commentTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  commentAuthor: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  commentWriter: { fontSize: 13, fontWeight: '600', color: '#555' },
+  commentRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  commentDate: { fontSize: 11, color: '#bbb' },
+  commentDeleteBtn: { padding: 2 },
+  commentContent: { fontSize: 14, color: '#333', lineHeight: 20, paddingLeft: 26 },
+  noComments: { textAlign: 'center', color: '#ccc', paddingVertical: 20, fontSize: 14 },
+
+  /* Comment input */
+  commentInputBar: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10,
+    borderTopWidth: 1, borderTopColor: '#f0f0f0', gap: 10,
   },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  postTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111',
-    lineHeight: 28,
-    marginBottom: 14,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 16,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  metaTextLight: {
-    fontSize: 13,
-    color: '#bbb',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#f0f0f0',
-    marginBottom: 16,
-  },
-  postContent: {
-    fontSize: 15,
-    color: '#333',
-    lineHeight: 24,
-  },
+  commentInput: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: '#000', maxHeight: 80 },
+  commentSendBtn: { backgroundColor: '#007AFF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
+  loginRequired: { flex: 1, textAlign: 'center', color: '#999', fontSize: 13, paddingVertical: 6 },
 });

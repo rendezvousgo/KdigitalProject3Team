@@ -13,15 +13,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createPost, updatePost } from '../services/communityApi';
-
-const CATEGORIES = [
-  { id: 1, name: '¿⁄¿Ø∞‘Ω√∆«' },
-  { id: 2, name: '¡÷¬˜ ∆¡' },
-  { id: 3, name: 'º”µµ ¡§∫∏' },
-  { id: 4, name: '¡˙πÆ/¥‰∫Ø' },
-];
+import { fetchCategories } from '../services/authApi';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function PostWriteScreen({ route, navigation }) {
+  const { user, isLoggedIn } = useAuth();
   const editPost = route.params?.editPost || null;
   const presetCategoryId = route.params?.categoryId || null;
 
@@ -31,62 +27,61 @@ export default function PostWriteScreen({ route, navigation }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [categories, setCategories] = useState([]);
 
   const isEdit = !!editPost;
 
   useEffect(() => {
+    loadCategories();
     if (editPost) {
       setTitle(editPost.title || '');
       setWriter(editPost.writer || '');
       setContent(editPost.content || '');
-      const found = CATEGORIES.find(c => c.id === editPost?.category?.id);
-      if (found) setSelectedCategoryId(found.id);
+      if (editPost?.category?.id) setSelectedCategoryId(editPost.category.id);
     } else if (presetCategoryId) {
       setSelectedCategoryId(presetCategoryId);
     }
+    // Î°úÍ∑∏Ïù∏ ÏÇ¨Ïö©ÏûêÎ©¥ writerÎ•º ÏûêÎèô ÏÑ§Ï†ï
+    if (isLoggedIn && user && !editPost) {
+      setWriter(user.nickname || user.username);
+    }
   }, []);
 
-  const selectedCategory = CATEGORIES.find(c => c.id === selectedCategoryId);
+  const loadCategories = async () => {
+    try {
+      const cats = await fetchCategories();
+      setCategories(cats);
+    } catch (e) {
+      // fallback
+      setCategories([
+        { id: 1, name: 'ÏûêÏú†Í≤åÏãúÌåê' },
+        { id: 2, name: 'Ï£ºÏ∞® ÌåÅ' },
+        { id: 3, name: 'ÎèôÎÑ§ ÏÜåÏãù' },
+        { id: 4, name: 'ÏßàÎ¨∏/ÎãµÎ≥Ä' },
+      ]);
+    }
+  };
+
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId);
 
   const handleSubmit = async () => {
-    if (!selectedCategoryId) {
-      Alert.alert('æÀ∏≤', 'ƒ´≈◊∞Ì∏Æ∏¶ º±≈√«ÿ¡÷ººø‰.');
-      return;
-    }
-    if (!title.trim()) {
-      Alert.alert('æÀ∏≤', '¡¶∏Ò¿ª ¿‘∑¬«ÿ¡÷ººø‰.');
-      return;
-    }
-    if (!content.trim()) {
-      Alert.alert('æÀ∏≤', '≥ªøÎ¿ª ¿‘∑¬«ÿ¡÷ººø‰.');
-      return;
-    }
+    if (!selectedCategoryId) { Alert.alert('ÏïåÎ¶º', 'Ïπ¥ÌÖåÍ≥†Î¶¨Î•º ÏÑ†ÌÉùÌï¥Ï£ºÏÑ∏Ïöî.'); return; }
+    if (!title.trim()) { Alert.alert('ÏïåÎ¶º', 'Ï†úÎ™©ÏùÑ ÏûÖÎ†•Ìï¥Ï£ºÏÑ∏Ïöî.'); return; }
+    if (!content.trim()) { Alert.alert('ÏïåÎ¶º', 'ÎÇ¥Ïö©ÏùÑ ÏûÖÎ†•Ìï¥Ï£ºÏÑ∏Ïöî.'); return; }
+
+    const finalWriter = isLoggedIn ? (user.nickname || user.username) : (writer.trim() || 'ÏùµÎ™Ö');
 
     setSubmitting(true);
     try {
       if (isEdit) {
-        await updatePost(editPost.id, {
-          title: title.trim(),
-          content: content.trim(),
-          writer: writer.trim(),
-          categoryId: selectedCategoryId,
-        });
-        Alert.alert('ºˆ¡§ øœ∑·', '∞‘Ω√±€¿Ã ºˆ¡§µ«æ˙Ω¿¥œ¥Ÿ.', [
-          { text: '»Æ¿Œ', onPress: () => navigation.goBack() },
-        ]);
+        await updatePost(editPost.id, { title: title.trim(), content: content.trim(), writer: finalWriter, categoryId: selectedCategoryId });
+        Alert.alert('ÏàòÏ†ï ÏôÑÎ£å', 'Í≤åÏãúÍ∏ÄÏù¥ ÏàòÏ†ïÎêòÏóàÏäµÎãàÎã§.', [{ text: 'ÌôïÏù∏', onPress: () => navigation.goBack() }]);
       } else {
-        await createPost({
-          title: title.trim(),
-          content: content.trim(),
-          writer: writer.trim(),
-          categoryId: selectedCategoryId,
-        });
-        Alert.alert('¿€º∫ øœ∑·', '∞‘Ω√±€¿Ã µÓ∑œµ«æ˙Ω¿¥œ¥Ÿ.', [
-          { text: '»Æ¿Œ', onPress: () => navigation.goBack() },
-        ]);
+        await createPost({ title: title.trim(), content: content.trim(), writer: finalWriter, categoryId: selectedCategoryId });
+        Alert.alert('ÏûëÏÑ± ÏôÑÎ£å', 'Í≤åÏãúÍ∏ÄÏù¥ Îì±Î°ùÎêòÏóàÏäµÎãàÎã§.', [{ text: 'ÌôïÏù∏', onPress: () => navigation.goBack() }]);
       }
     } catch (e) {
-      Alert.alert('ø‰√ª Ω«∆–', e.message);
+      Alert.alert('ÏöîÏ≤≠ Ïã§Ìå®', e.message);
     } finally {
       setSubmitting(false);
     }
@@ -94,14 +89,10 @@ export default function PostWriteScreen({ route, navigation }) {
 
   const handleCancel = () => {
     if (title.trim() || content.trim()) {
-      Alert.alert(
-        '¿€º∫ √Îº“',
-        '¿€º∫ ¡ﬂ¿Œ ≥ªøÎ¿Ã ªË¡¶µÀ¥œ¥Ÿ. √Îº“«œΩ√∞⁄Ω¿¥œ±Ó?',
-        [
-          { text: '∞Ëº” ¿€º∫', style: 'cancel' },
-          { text: '√Îº“', style: 'destructive', onPress: () => navigation.goBack() },
-        ]
-      );
+      Alert.alert('ÏûëÏÑ± Ï∑®ÏÜå', 'ÏûëÏÑ± Ï§ëÏù∏ ÎÇ¥Ïö©Ïù¥ ÏÇ≠Ï†úÎê©ÎãàÎã§. Ï∑®ÏÜåÌïòÏãúÍ≤†ÏäµÎãàÍπå?', [
+        { text: 'Í≥ÑÏÜç ÏûëÏÑ±', style: 'cancel' },
+        { text: 'Ï∑®ÏÜå', style: 'destructive', onPress: () => navigation.goBack() },
+      ]);
     } else {
       navigation.goBack();
     }
@@ -111,24 +102,16 @@ export default function PostWriteScreen({ route, navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel} style={styles.cancelBtn}>
-          <Text style={styles.cancelText}>√Îº“</Text>
+          <Text style={styles.cancelText}>Ï∑®ÏÜå</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isEdit ? '±€ ºˆ¡§' : '±€ ¿€º∫'}</Text>
+        <Text style={styles.headerTitle}>{isEdit ? 'Í∏Ä ÏàòÏ†ï' : 'Í∏Ä ÏûëÏÑ±'}</Text>
         <TouchableOpacity
-          style={[
-            styles.submitBtn,
-            (submitting || !title.trim() || !content.trim() || !selectedCategoryId) && styles.submitBtnDisabled,
-          ]}
+          style={[styles.submitBtn, (submitting || !title.trim() || !content.trim() || !selectedCategoryId) && styles.submitBtnDisabled]}
           onPress={handleSubmit}
           disabled={submitting || !title.trim() || !content.trim() || !selectedCategoryId}
         >
-          <Text
-            style={[
-              styles.submitText,
-              (submitting || !title.trim() || !content.trim() || !selectedCategoryId) && styles.submitTextDisabled,
-            ]}
-          >
-            {isEdit ? 'ºˆ¡§' : 'µÓ∑œ'}
+          <Text style={[styles.submitText, (submitting || !title.trim() || !content.trim() || !selectedCategoryId) && styles.submitTextDisabled]}>
+            {isEdit ? 'ÏàòÏ†ï' : 'Îì±Î°ù'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -136,77 +119,55 @@ export default function PostWriteScreen({ route, navigation }) {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.formSection}>
-            <Text style={styles.label}>ƒ´≈◊∞Ì∏Æ</Text>
-            <TouchableOpacity
-              style={styles.categorySelector}
-              onPress={() => setShowCategoryPicker(!showCategoryPicker)}
-            >
+            <Text style={styles.label}>Ïπ¥ÌÖåÍ≥†Î¶¨</Text>
+            <TouchableOpacity style={styles.categorySelector} onPress={() => setShowCategoryPicker(!showCategoryPicker)}>
               <Text style={[styles.categorySelectorText, !selectedCategory && styles.placeholder]}>
-                {selectedCategory ? selectedCategory.name : 'ƒ´≈◊∞Ì∏Æ∏¶ º±≈√«ÿ¡÷ººø‰'}
+                {selectedCategory ? selectedCategory.name : 'Ïπ¥ÌÖåÍ≥†Î¶¨Î•º ÏÑ†ÌÉùÌï¥Ï£ºÏÑ∏Ïöî'}
               </Text>
               <Ionicons name={showCategoryPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#999" />
             </TouchableOpacity>
-
             {showCategoryPicker && (
               <View style={styles.categoryPicker}>
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
                     style={[styles.categoryOption, selectedCategoryId === cat.id && styles.categoryOptionActive]}
-                    onPress={() => {
-                      setSelectedCategoryId(cat.id);
-                      setShowCategoryPicker(false);
-                    }}
+                    onPress={() => { setSelectedCategoryId(cat.id); setShowCategoryPicker(false); }}
                   >
-                    <Text style={[styles.categoryOptionText, selectedCategoryId === cat.id && styles.categoryOptionTextActive]}>
-                      {cat.name}
-                    </Text>
-                    {selectedCategoryId === cat.id && (
-                      <Ionicons name="checkmark" size={18} color="#007AFF" />
-                    )}
+                    <Text style={[styles.categoryOptionText, selectedCategoryId === cat.id && styles.categoryOptionTextActive]}>{cat.name}</Text>
+                    {selectedCategoryId === cat.id && <Ionicons name="checkmark" size={18} color="#007AFF" />}
                   </TouchableOpacity>
                 ))}
               </View>
             )}
           </View>
 
-          <View style={styles.formSection}>
-            <Text style={styles.label}>¿€º∫¿⁄</Text>
-            <TextInput
-              style={styles.titleInput}
-              placeholder="¿€º∫¿⁄∏Ì¿ª ¿‘∑¬«œººø‰ (∫ÒøÏ∏È ¿Õ∏Ì)"
-              placeholderTextColor="#bbb"
-              value={writer}
-              onChangeText={setWriter}
-              maxLength={30}
-            />
-          </View>
+          {!isLoggedIn && (
+            <View style={styles.formSection}>
+              <Text style={styles.label}>ÏûëÏÑ±Ïûê</Text>
+              <TextInput style={styles.titleInput} placeholder="ÏûëÏÑ±ÏûêÎ™ÖÏùÑ ÏûÖÎ†•ÌïòÏÑ∏Ïöî (ÎπÑÏö∞Î©¥ ÏùµÎ™Ö)" placeholderTextColor="#bbb" value={writer} onChangeText={setWriter} maxLength={30} />
+            </View>
+          )}
+
+          {isLoggedIn && (
+            <View style={styles.formSection}>
+              <Text style={styles.label}>ÏûëÏÑ±Ïûê</Text>
+              <View style={styles.writerInfo}>
+                <Ionicons name="person-circle" size={20} color="#007AFF" />
+                <Text style={styles.writerInfoText}>{user.nickname || user.username}</Text>
+              </View>
+            </View>
+          )}
 
           <View style={styles.formSection}>
-            <Text style={styles.label}>¡¶∏Ò</Text>
-            <TextInput
-              style={styles.titleInput}
-              placeholder="¡¶∏Ò¿ª ¿‘∑¬«œººø‰"
-              placeholderTextColor="#bbb"
-              value={title}
-              onChangeText={setTitle}
-              maxLength={100}
-            />
+            <Text style={styles.label}>Ï†úÎ™©</Text>
+            <TextInput style={styles.titleInput} placeholder="Ï†úÎ™©ÏùÑ ÏûÖÎ†•ÌïòÏÑ∏Ïöî" placeholderTextColor="#bbb" value={title} onChangeText={setTitle} maxLength={100} />
             <Text style={styles.charCount}>{title.length}/100</Text>
           </View>
 
           <View style={styles.formSection}>
-            <Text style={styles.label}>≥ªøÎ</Text>
-            <TextInput
-              style={styles.contentInput}
-              placeholder="≥ªøÎ¿ª ¿‘∑¬«œººø‰"
-              placeholderTextColor="#bbb"
-              value={content}
-              onChangeText={setContent}
-              multiline
-              textAlignVertical="top"
-              maxLength={5000}
-            />
+            <Text style={styles.label}>ÎÇ¥Ïö©</Text>
+            <TextInput style={styles.contentInput} placeholder="ÎÇ¥Ïö©ÏùÑ ÏûÖÎ†•ÌïòÏÑ∏Ïöî" placeholderTextColor="#bbb" value={content} onChangeText={setContent} multiline textAlignVertical="top" maxLength={5000} />
             <Text style={styles.charCount}>{content.length}/5000</Text>
           </View>
         </ScrollView>
@@ -216,144 +177,33 @@ export default function PostWriteScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
-  cancelBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  cancelText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#000',
-  },
-  submitBtn: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  submitBtnDisabled: {
-    backgroundColor: '#E0E0E0',
-  },
-  submitText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  submitTextDisabled: {
-    color: '#bbb',
-  },
-
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  formSection: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#999',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  categorySelector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F8F8F8',
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  categorySelectorText: {
-    fontSize: 15,
-    color: '#333',
-  },
-  placeholder: {
-    color: '#bbb',
-  },
-  categoryPicker: {
-    marginTop: 8,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  categoryOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#FAFAFA',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  categoryOptionActive: {
-    backgroundColor: '#E3F2FD',
-  },
-  categoryOptionText: {
-    fontSize: 15,
-    color: '#333',
-  },
-  categoryOptionTextActive: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-
-  titleInput: {
-    backgroundColor: '#F8F8F8',
-    padding: 14,
-    borderRadius: 10,
-    fontSize: 15,
-    color: '#000',
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  charCount: {
-    textAlign: 'right',
-    fontSize: 12,
-    color: '#ccc',
-    marginTop: 6,
-  },
-
-  contentInput: {
-    backgroundColor: '#F8F8F8',
-    padding: 14,
-    borderRadius: 10,
-    fontSize: 15,
-    color: '#000',
-    minHeight: 250,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-    lineHeight: 22,
-  },
+  cancelBtn: { paddingVertical: 6, paddingHorizontal: 4 },
+  cancelText: { fontSize: 16, color: '#666' },
+  headerTitle: { fontSize: 17, fontWeight: '600', color: '#000' },
+  submitBtn: { backgroundColor: '#007AFF', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 8 },
+  submitBtnDisabled: { backgroundColor: '#E0E0E0' },
+  submitText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  submitTextDisabled: { color: '#bbb' },
+  scroll: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+  formSection: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12 },
+  label: { fontSize: 13, fontWeight: '600', color: '#999', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  categorySelector: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8F8F8', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#f0f0f0' },
+  categorySelectorText: { fontSize: 15, color: '#333' },
+  placeholder: { color: '#bbb' },
+  categoryPicker: { marginTop: 8, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: '#f0f0f0' },
+  categoryOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#FAFAFA', borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  categoryOptionActive: { backgroundColor: '#E3F2FD' },
+  categoryOptionText: { fontSize: 15, color: '#333' },
+  categoryOptionTextActive: { color: '#007AFF', fontWeight: '600' },
+  titleInput: { backgroundColor: '#F8F8F8', padding: 14, borderRadius: 10, fontSize: 15, color: '#000', borderWidth: 1, borderColor: '#f0f0f0' },
+  charCount: { textAlign: 'right', fontSize: 12, color: '#ccc', marginTop: 6 },
+  contentInput: { backgroundColor: '#F8F8F8', padding: 14, borderRadius: 10, fontSize: 15, color: '#000', minHeight: 250, borderWidth: 1, borderColor: '#f0f0f0', lineHeight: 22 },
+  writerInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F0F8FF', padding: 14, borderRadius: 10 },
+  writerInfoText: { fontSize: 15, color: '#007AFF', fontWeight: '500' },
 });

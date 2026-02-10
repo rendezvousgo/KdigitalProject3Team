@@ -1,3 +1,4 @@
+// ADB reverse М▐╛Л⌡▄К■╘ Л┌╛Л ╘: adb reverse tcp:8080 tcp:8080
+// Л²╢К═┤Й╡▄ М∙≤К╘╢ Л≈░К╝╛К═┬Л²╢М└╟/М∙╦К⌠°М▐╟ К╙╗К▒░ localhost:8080Л°╪К║° PC К╟╠Л≈■К⌠°Л≈░ Л═▒Й╥╪ Й╟─К┼╔
+// (М∙╦К⌠°М▐╟Л²─ USB Л≈╟Й╡╟ + adb reverse М∙└Л ■)
 export const API_BASE_URL = 'http://localhost:8080';
-
-// NOTE: ╫га╕ ╣П╧ыюл╫╨©║╪╜ ев╫╨ф╝гр ╟Ф©Л localhost ╢К╫е PCюг LAN IP╥н ╨╞╟Фго╪╪©Д.

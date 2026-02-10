@@ -14,26 +14,37 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchPosts } from '../services/communityApi';
-
-const CATEGORIES = [
-  { id: 0, name: '¿¸√º' },
-  { id: 1, name: '¿⁄¿Ø∞‘Ω√∆«' },
-  { id: 2, name: '¡÷¬˜ ∆¡' },
-  { id: 3, name: 'º”µµ ¡§∫∏' },
-  { id: 4, name: '¡˙πÆ/¥‰∫Ø' },
-];
+import { fetchCategories } from '../services/authApi';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function CommunityScreen({ navigation }) {
+  const { isLoggedIn } = useAuth();
   const [posts, setPosts] = useState([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
+  const [categories, setCategories] = useState([{ id: 0, name: 'Ï†ÑÏ≤¥' }]);
   const [selectedCategory, setSelectedCategory] = useState(0);
   const [searchText, setSearchText] = useState('');
   const [searchType, setSearchType] = useState('title');
   const [showSearchTypeMenu, setShowSearchTypeMenu] = useState(false);
+
+  const loadCategories = async () => {
+    try {
+      const cats = await fetchCategories();
+      setCategories([{ id: 0, name: 'Ï†ÑÏ≤¥' }, ...cats]);
+    } catch (e) {
+      // fallback
+      setCategories([
+        { id: 0, name: 'Ï†ÑÏ≤¥' },
+        { id: 1, name: 'ÏûêÏú†Í≤åÏãúÌåê' },
+        { id: 2, name: 'Ï£ºÏ∞® ÌåÅ' },
+        { id: 3, name: 'ÎèôÎÑ§ ÏÜåÏãù' },
+        { id: 4, name: 'ÏßàÎ¨∏/ÎãµÎ≥Ä' },
+      ]);
+    }
+  };
 
   const resetAndLoad = useCallback(async (categoryId = selectedCategory) => {
     setLoading(true);
@@ -44,7 +55,7 @@ export default function CommunityScreen({ navigation }) {
       setPosts(data.content || []);
       setHasMore(!data.last);
     } catch (e) {
-      Alert.alert('∫“∑Øø¿±‚ Ω«∆–', e.message);
+      Alert.alert('Î∂àÎü¨Ïò§Í∏∞ Ïã§Ìå®', e.message);
     } finally {
       setLoading(false);
     }
@@ -52,6 +63,7 @@ export default function CommunityScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
+      loadCategories();
       resetAndLoad();
     }, [resetAndLoad])
   );
@@ -66,7 +78,7 @@ export default function CommunityScreen({ navigation }) {
       setPage(nextPage);
       setHasMore(!data.last);
     } catch (e) {
-      Alert.alert('∫“∑Øø¿±‚ Ω«∆–', e.message);
+      Alert.alert('Î∂àÎü¨Ïò§Í∏∞ Ïã§Ìå®', e.message);
     } finally {
       setLoading(false);
     }
@@ -75,6 +87,7 @@ export default function CommunityScreen({ navigation }) {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setSearchText('');
+    await loadCategories();
     await resetAndLoad();
     setRefreshing(false);
   }, [resetAndLoad]);
@@ -90,8 +103,16 @@ export default function CommunityScreen({ navigation }) {
 
   const getCategoryName = (post) => {
     const id = post?.category?.id;
-    const found = CATEGORIES.find(c => c.id === id);
-    return found ? found.name : 'πÃ∫–∑˘';
+    const found = categories.find(c => c.id === id);
+    return found ? found.name : 'ÎØ∏Î∂ÑÎ•ò';
+  };
+
+  const handleWritePress = () => {
+    if (!isLoggedIn) {
+      Alert.alert('ÏïåÎ¶º', 'Í∏ÄÏùÑ ÏûëÏÑ±ÌïòÎ†§Î©¥ Î°úÍ∑∏Ïù∏Ïù¥ ÌïÑÏöîÌï©ÎãàÎã§.\nÎßàÏù¥ÌéòÏù¥ÏßÄÏóêÏÑú Î°úÍ∑∏Ïù∏Ìï¥Ï£ºÏÑ∏Ïöî.');
+      return;
+    }
+    navigation.navigate('PostWrite', { categoryId: selectedCategory !== 0 ? selectedCategory : null });
   };
 
   const renderPostItem = ({ item }) => (
@@ -108,7 +129,7 @@ export default function CommunityScreen({ navigation }) {
       <View style={styles.postBottom}>
         <View style={styles.postAuthor}>
           <Ionicons name="person-circle-outline" size={16} color="#999" />
-          <Text style={styles.postWriter}>{item.writer || '¿Õ∏Ì'}</Text>
+          <Text style={styles.postWriter}>{item.writer || 'ÏùµÎ™Ö'}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -117,18 +138,13 @@ export default function CommunityScreen({ navigation }) {
   const renderHeader = () => (
     <View>
       <View style={styles.searchBar}>
-        <TouchableOpacity
-          style={styles.searchTypeBtn}
-          onPress={() => setShowSearchTypeMenu(!showSearchTypeMenu)}
-        >
-          <Text style={styles.searchTypeText}>
-            {searchType === 'title' ? '¡¶∏Ò' : '¿€º∫¿⁄'}
-          </Text>
+        <TouchableOpacity style={styles.searchTypeBtn} onPress={() => setShowSearchTypeMenu(!showSearchTypeMenu)}>
+          <Text style={styles.searchTypeText}>{searchType === 'title' ? 'Ï†úÎ™©' : 'ÏûëÏÑ±Ïûê'}</Text>
           <Ionicons name="chevron-down" size={14} color="#666" />
         </TouchableOpacity>
         <TextInput
           style={styles.searchInput}
-          placeholder="∞ÀªˆæÓ∏¶ ¿‘∑¬«œººø‰"
+          placeholder="Í≤ÄÏÉâÏñ¥Î•º ÏûÖÎ†•ÌïòÏÑ∏Ïöî"
           placeholderTextColor="#bbb"
           value={searchText}
           onChangeText={setSearchText}
@@ -146,13 +162,13 @@ export default function CommunityScreen({ navigation }) {
             style={[styles.searchTypeOption, searchType === 'title' && styles.searchTypeActive]}
             onPress={() => { setSearchType('title'); setShowSearchTypeMenu(false); }}
           >
-            <Text style={[styles.searchTypeOptionText, searchType === 'title' && styles.searchTypeActiveText]}>¡¶∏Ò</Text>
+            <Text style={[styles.searchTypeOptionText, searchType === 'title' && styles.searchTypeActiveText]}>Ï†úÎ™©</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.searchTypeOption, searchType === 'writer' && styles.searchTypeActive]}
             onPress={() => { setSearchType('writer'); setShowSearchTypeMenu(false); }}
           >
-            <Text style={[styles.searchTypeOptionText, searchType === 'writer' && styles.searchTypeActiveText]}>¿€º∫¿⁄</Text>
+            <Text style={[styles.searchTypeOptionText, searchType === 'writer' && styles.searchTypeActiveText]}>ÏûëÏÑ±Ïûê</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -160,26 +176,15 @@ export default function CommunityScreen({ navigation }) {
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
-        data={CATEGORIES}
+        data={categories}
         keyExtractor={item => String(item.id)}
         contentContainerStyle={styles.categoryList}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={[
-              styles.categoryTab,
-              selectedCategory === item.id && styles.categoryTabActive,
-            ]}
-            onPress={() => {
-              setSelectedCategory(item.id);
-              resetAndLoad(item.id);
-            }}
+            style={[styles.categoryTab, selectedCategory === item.id && styles.categoryTabActive]}
+            onPress={() => { setSelectedCategory(item.id); resetAndLoad(item.id); }}
           >
-            <Text
-              style={[
-                styles.categoryTabText,
-                selectedCategory === item.id && styles.categoryTabTextActive,
-              ]}
-            >
+            <Text style={[styles.categoryTabText, selectedCategory === item.id && styles.categoryTabTextActive]}>
               {item.name}
             </Text>
           </TouchableOpacity>
@@ -190,10 +195,10 @@ export default function CommunityScreen({ navigation }) {
         <Text style={styles.resultText}>
           {searchText.trim() ? (
             <>
-              <Text style={{ color: '#007AFF', fontWeight: '600' }}>&quot;{searchText}&quot;</Text> ∞Àªˆ∞·∞˙
+              <Text style={{ color: '#007AFF', fontWeight: '600' }}>"{searchText}"</Text> Í≤ÄÏÉâÍ≤∞Í≥º
             </>
           ) : null}
-          {' '}√— <Text style={{ fontWeight: '600' }}>{filteredPosts.length}</Text>∞«
+          {' '}Ï¥ù <Text style={{ fontWeight: '600' }}>{filteredPosts.length}</Text>Í±¥
         </Text>
       </View>
     </View>
@@ -202,21 +207,18 @@ export default function CommunityScreen({ navigation }) {
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="document-text-outline" size={60} color="#ddd" />
-      <Text style={styles.emptyText}>∞‘Ω√±€¿Ã æ¯Ω¿¥œ¥Ÿ</Text>
-      <Text style={styles.emptySubText}>√π ±€¿ª ¿€º∫«ÿ∫∏ººø‰.</Text>
+      <Text style={styles.emptyText}>Í≤åÏãúÍ∏ÄÏù¥ ÏóÜÏäµÎãàÎã§</Text>
+      <Text style={styles.emptySubText}>Ï≤´ Í∏ÄÏùÑ ÏûëÏÑ±Ìï¥Î≥¥ÏÑ∏Ïöî.</Text>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>ƒøπ¬¥œ∆º</Text>
-        <TouchableOpacity
-          style={styles.writeBtn}
-          onPress={() => navigation.navigate('PostWrite', { categoryId: selectedCategory !== 0 ? selectedCategory : null })}
-        >
+        <Text style={styles.headerTitle}>Ïª§ÎÆ§ÎãàÌã∞</Text>
+        <TouchableOpacity style={styles.writeBtn} onPress={handleWritePress}>
           <Ionicons name="create-outline" size={20} color="#fff" />
-          <Text style={styles.writeBtnText}>±€æ≤±‚</Text>
+          <Text style={styles.writeBtnText}>Í∏ÄÏì∞Í∏∞</Text>
         </TouchableOpacity>
       </View>
 
@@ -234,11 +236,9 @@ export default function CommunityScreen({ navigation }) {
         }
         ListFooterComponent={
           loading ? (
-            <View style={styles.loadingMore}>
-              <ActivityIndicator size="small" color="#007AFF" />
-            </View>
+            <View style={styles.loadingMore}><ActivityIndicator size="small" color="#007AFF" /></View>
           ) : !hasMore && filteredPosts.length > 0 ? (
-            <Text style={styles.endText}>∏µÁ ∞‘Ω√±€¿ª ∫“∑Øø‘Ω¿¥œ¥Ÿ</Text>
+            <Text style={styles.endText}>Î™®Îì† Í≤åÏãúÍ∏ÄÏùÑ Î∂àÎü¨ÏôîÏäµÎãàÎã§</Text>
           ) : null
         }
       />
@@ -247,225 +247,53 @@ export default function CommunityScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#000',
-  },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#000' },
   writeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    gap: 6,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#007AFF',
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, gap: 6,
   },
-  writeBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  listContent: {
-    paddingBottom: 20,
-  },
-
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    backgroundColor: '#fff',
-    gap: 8,
-  },
-  searchTypeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 4,
-  },
-  searchTypeText: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-  },
-  searchInput: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-    fontSize: 14,
-    color: '#000',
-  },
-  searchBtn: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 8,
-  },
+  writeBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  listContent: { paddingBottom: 20 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, backgroundColor: '#fff', gap: 8 },
+  searchTypeBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, gap: 4 },
+  searchTypeText: { fontSize: 13, color: '#666', fontWeight: '500' },
+  searchInput: { flex: 1, backgroundColor: '#F5F5F5', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, fontSize: 14, color: '#000' },
+  searchBtn: { backgroundColor: '#007AFF', padding: 10, borderRadius: 8 },
   searchTypeMenu: {
-    position: 'absolute',
-    top: 56,
-    left: 16,
-    zIndex: 10,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    overflow: 'hidden',
+    position: 'absolute', top: 56, left: 16, zIndex: 10, backgroundColor: '#fff',
+    borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, overflow: 'hidden',
   },
-  searchTypeOption: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  searchTypeActive: {
-    backgroundColor: '#E3F2FD',
-  },
-  searchTypeOptionText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  searchTypeActiveText: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-
-  categoryList: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    gap: 8,
-  },
-  categoryTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-  },
-  categoryTabActive: {
-    backgroundColor: '#007AFF',
-  },
-  categoryTabText: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-  },
-  categoryTabTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-
-  resultBar: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  resultText: {
-    fontSize: 13,
-    color: '#999',
-  },
-
+  searchTypeOption: { paddingHorizontal: 20, paddingVertical: 12 },
+  searchTypeActive: { backgroundColor: '#E3F2FD' },
+  searchTypeOptionText: { fontSize: 14, color: '#333' },
+  searchTypeActiveText: { color: '#007AFF', fontWeight: '600' },
+  categoryList: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', gap: 8 },
+  categoryTab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F5F5F5' },
+  categoryTabActive: { backgroundColor: '#007AFF' },
+  categoryTabText: { fontSize: 13, color: '#666', fontWeight: '500' },
+  categoryTabTextActive: { color: '#fff', fontWeight: '600' },
+  resultBar: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  resultText: { fontSize: 13, color: '#999' },
   postItem: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 10,
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#fff', marginHorizontal: 16, marginTop: 10, borderRadius: 14, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
   },
-  postTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  categoryBadge: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#007AFF',
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  postDate: {
-    fontSize: 12,
-    color: '#bbb',
-  },
-  postTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111',
-    lineHeight: 22,
-    marginBottom: 10,
-  },
-  postBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  postAuthor: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  postWriter: {
-    fontSize: 13,
-    color: '#999',
-  },
-
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#999',
-    marginTop: 16,
-  },
-  emptySubText: {
-    fontSize: 13,
-    color: '#ccc',
-    marginTop: 6,
-  },
-
-  loadingMore: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  endText: {
-    textAlign: 'center',
-    paddingVertical: 20,
-    fontSize: 13,
-    color: '#ccc',
-  },
+  postTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  categoryBadge: { fontSize: 11, fontWeight: '600', color: '#007AFF', backgroundColor: '#E3F2FD', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  postDate: { fontSize: 12, color: '#bbb' },
+  postTitle: { fontSize: 15, fontWeight: '600', color: '#111', lineHeight: 22, marginBottom: 10 },
+  postBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  postAuthor: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  postWriter: { fontSize: 13, color: '#999' },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  emptyText: { fontSize: 16, fontWeight: '600', color: '#999', marginTop: 16 },
+  emptySubText: { fontSize: 13, color: '#ccc', marginTop: 6 },
+  loadingMore: { paddingVertical: 20, alignItems: 'center' },
+  endText: { textAlign: 'center', paddingVertical: 20, fontSize: 13, color: '#ccc' },
 });

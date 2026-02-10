@@ -50,8 +50,12 @@ public class BoardController {
 
     @PostMapping("/write")
     public Board writeBoard(@RequestBody Board board, HttpSession session) {
-        String username = requireLogin(session);
-        board.setWriter(username);
+        String username = getLoginUser(session);
+        if (username != null) {
+            board.setWriter(username);
+        } else if (board.getWriter() == null || board.getWriter().trim().isEmpty()) {
+            board.setWriter("익명");
+        }
         if (board.getCategory() != null) {
             board.setCategory(resolveCategory(board.getCategory()));
         }
@@ -60,11 +64,12 @@ public class BoardController {
 
     @PutMapping("/update/{id}")
     public Board updateBoard(@PathVariable(name = "id") Long id, @RequestBody Board boardDetails, HttpSession session) {
-        String username = requireLogin(session);
-        boolean isAdmin = isAdmin(session);
+        String username = getLoginUser(session);
+        boolean admin = isAdmin(session);
 
         return boardRepository.findById(id).map(board -> {
-            if (!isAdmin && (board.getWriter() == null || !board.getWriter().equals(username))) {
+            // 로그인된 경우 본인/관리자만, 비로그인이면 누구나 수정 허용
+            if (username != null && !admin && (board.getWriter() == null || !board.getWriter().equals(username))) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "not owner");
             }
             if (boardDetails.getTitle() != null) {
@@ -76,19 +81,22 @@ public class BoardController {
             if (boardDetails.getCategory() != null) {
                 board.setCategory(resolveCategory(boardDetails.getCategory()));
             }
-            board.setWriter(username);
+            if (boardDetails.getWriter() != null && !boardDetails.getWriter().trim().isEmpty()) {
+                board.setWriter(boardDetails.getWriter());
+            }
             return boardRepository.save(board);
         }).orElse(null);
     }
 
     @DeleteMapping("/delete/{id}")
     public String deleteBoard(@PathVariable(name = "id") Long id, HttpSession session) {
-        String username = requireLogin(session);
-        boolean isAdmin = isAdmin(session);
+        String username = getLoginUser(session);
+        boolean admin = isAdmin(session);
 
         Board board = boardRepository.findById(id).orElse(null);
         if (board == null) return "FAIL: ID " + id + " not found";
-        if (!isAdmin && (board.getWriter() == null || !board.getWriter().equals(username))) {
+        // 로그인된 경우 본인/관리자만, 비로그인이면 누구나 삭제 허용
+        if (username != null && !admin && (board.getWriter() == null || !board.getWriter().equals(username))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "not owner");
         }
 
@@ -97,12 +105,9 @@ public class BoardController {
         return "SUCCESS: Deleted ID " + id;
     }
 
-    private String requireLogin(HttpSession session) {
-        String username = (String) session.getAttribute(AuthController.SESSION_USER);
-        if (username == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "login required");
-        }
-        return username;
+    /** 로그인되어 있으면 username, 아니면 null */
+    private String getLoginUser(HttpSession session) {
+        return (String) session.getAttribute(AuthController.SESSION_USER);
     }
 
     private boolean isAdmin(HttpSession session) {

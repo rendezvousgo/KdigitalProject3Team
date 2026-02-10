@@ -34,6 +34,8 @@ public class AuthController {
         user.setUsername(req.getUsername().trim());
         user.setPasswordHash(encoder.encode(req.getPassword()));
         user.setRole("USER");
+        user.setNickname(req.getNickname() != null ? req.getNickname().trim() : req.getUsername().trim());
+        user.setEmail(req.getEmail() != null ? req.getEmail().trim() : "");
         return new UserDto(userRepository.save(user));
     }
 

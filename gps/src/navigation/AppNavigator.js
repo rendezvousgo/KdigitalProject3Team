@@ -2,8 +2,9 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'; // 아이콘 추가
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { View, Platform, Text } from 'react-native';
+import { AuthProvider } from '../contexts/AuthContext';
 
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -127,33 +128,35 @@ function HomeTabs({ route, navigation }) {
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Home" component={HomeTabs} />
-        <Stack.Screen 
-          name="Search" 
-          component={SearchScreen}
-          options={{ presentation: 'modal' }}
-        />
-        <Stack.Screen 
-          name="AIAssistant" 
-          component={AIAssistantScreen}
-        />
-        <Stack.Screen 
-          name="PostDetail" 
-          component={PostDetailScreen}
-          options={{
-            presentation: 'card',
-          }}
-        />
-        <Stack.Screen 
-          name="PostWrite" 
-          component={PostWriteScreen}
-          options={{
-            presentation: 'modal',
-          }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AuthProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Home" component={HomeTabs} />
+          <Stack.Screen 
+            name="Search" 
+            component={SearchScreen}
+            options={{ presentation: 'modal' }}
+          />
+          <Stack.Screen 
+            name="AIAssistant" 
+            component={AIAssistantScreen}
+          />
+          <Stack.Screen 
+            name="PostDetail" 
+            component={PostDetailScreen}
+            options={{
+              presentation: 'card',
+            }}
+          />
+          <Stack.Screen 
+            name="PostWrite" 
+            component={PostWriteScreen}
+            options={{
+              presentation: 'modal',
+            }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </AuthProvider>
   );
 }

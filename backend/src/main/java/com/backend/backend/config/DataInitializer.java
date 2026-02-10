@@ -31,10 +31,12 @@ public class DataInitializer {
                 admin.setUsername(adminUsername);
                 admin.setPasswordHash(encoder.encode(adminPassword));
                 admin.setRole("ADMIN");
+                admin.setNickname("관리자");
+                admin.setEmail("admin@safeparking.com");
                 userRepository.save(admin);
             }
 
-            String[] defaults = {"오류 제보", "Q&A"};
+            String[] defaults = {"자유게시판", "주차 팁", "동네 소식", "질문/답변"};
             Arrays.stream(defaults).forEach(name -> {
                 boolean exists = categoryRepository.findAll().stream().anyMatch(c -> c.getName().equals(name));
                 if (!exists) {

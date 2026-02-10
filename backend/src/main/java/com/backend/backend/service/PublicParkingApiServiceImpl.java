@@ -1,4 +1,4 @@
-﻿package com.backend.backend.service;
+package com.backend.backend.service;
 
 import com.backend.backend.config.KakaoApiProperties;
 import com.backend.backend.config.ParkingApiProperties;

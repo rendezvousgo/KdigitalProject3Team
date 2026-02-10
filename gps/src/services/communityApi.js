@@ -11,7 +11,7 @@ function buildUrl(path, params = {}) {
 }
 
 async function request(url, options = {}) {
-  const res = await fetch(url, options);
+  const res = await fetch(url, { credentials: 'include', ...options });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `HTTP ${res.status}`);
@@ -36,7 +36,7 @@ export async function createPost({ title, content, writer, categoryId }) {
   const payload = {
     title,
     content,
-    writer: writer || '�͸�',
+    writer: writer || '익명',
   };
   if (categoryId) {
     payload.category = { id: Number(categoryId) };
@@ -54,7 +54,7 @@ export async function updatePost(id, { title, content, writer, categoryId }) {
   const payload = {
     title,
     content,
-    writer: writer || '�͸�',
+    writer: writer || '익명',
   };
   if (categoryId) {
     payload.category = { id: Number(categoryId) };
@@ -70,10 +70,43 @@ export async function updatePost(id, { title, content, writer, categoryId }) {
 
 export async function deletePost(id) {
   const url = buildUrl(`/api/board/delete/${id}`);
-  const res = await fetch(url, { method: 'DELETE' });
+  const res = await fetch(url, { method: 'DELETE', credentials: 'include' });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `HTTP ${res.status}`);
+  }
+  return res.text();
+}
+
+/* ── 댓글 API ── */
+export async function fetchComments(boardId) {
+  const url = buildUrl(`/api/board/${boardId}/comments`);
+  const res = await fetch(url, { credentials: 'include' });
+  if (!res.ok) throw new Error('댓글 불러오기 실패');
+  return res.json();
+}
+
+export async function addComment(boardId, content) {
+  const url = buildUrl(`/api/board/${boardId}/comments`);
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || '댓글 작성 실패');
+  }
+  return res.json();
+}
+
+export async function deleteComment(boardId, commentId) {
+  const url = buildUrl(`/api/board/${boardId}/comments/${commentId}`);
+  const res = await fetch(url, { method: 'DELETE', credentials: 'include' });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || '댓글 삭제 실패');
   }
   return res.text();
 }
