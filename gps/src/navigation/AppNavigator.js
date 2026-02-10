@@ -9,6 +9,9 @@ import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import AIAssistantScreen from '../screens/AIAssistantScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import CommunityScreen from '../screens/CommunityScreen';
+import PostDetailScreen from '../screens/PostDetailScreen';
+import PostWriteScreen from '../screens/PostWriteScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -53,6 +56,8 @@ function HomeTabs({ route, navigation }) {
                 <Ionicons name="sparkles" size={24} color={focused ? '#fff' : '#5856D6'} />
               </View>
             );
+          } else if (route.name === 'CommunityTab') {
+            return <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />;
           } else if (route.name === 'ProfileTab') {
             return <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />;
           }
@@ -89,6 +94,11 @@ function HomeTabs({ route, navigation }) {
         options={{ tabBarLabel: 'AI 추천' }}
       />
       <Tab.Screen 
+        name="CommunityTab" 
+        component={CommunityScreen}
+        options={{ tabBarLabel: '커뮤니티' }}
+      />
+      <Tab.Screen 
         name="ProfileTab" 
         component={ProfileScreen}
         options={{ tabBarLabel: '마이' }}
@@ -118,6 +128,20 @@ export default function AppNavigator() {
           component={AIAssistantScreen}
           options={{
             presentation: 'card',
+          }}
+        />
+        <Stack.Screen 
+          name="PostDetail" 
+          component={PostDetailScreen}
+          options={{
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen 
+          name="PostWrite" 
+          component={PostWriteScreen}
+          options={{
+            presentation: 'modal',
           }}
         />
       </Stack.Navigator>
