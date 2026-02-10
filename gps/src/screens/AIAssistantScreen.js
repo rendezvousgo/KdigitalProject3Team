@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
+import Voice from '@react-native-voice/voice';
 
 // 더미 AI 대화
 const INITIAL_MESSAGES = [
@@ -45,6 +46,7 @@ export default function AIAssistantScreen({ navigation }) {
   const typingDots = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const waveAnim = useRef(new Animated.Value(0)).current;
+  const recognizedTextRef = useRef('');
 
   useEffect(() => {
     if (isTyping) {
@@ -78,6 +80,41 @@ export default function AIAssistantScreen({ navigation }) {
     }
   }, [isListening]);
 
+  // STT ?대깽???몃━?⑥씠??
+  useEffect(() => {
+    Voice.onSpeechResults = (event) => {
+      const text = event?.value?.[0] ?? '';
+      recognizedTextRef.current = text;
+      setInputText(text);
+    };
+
+    Voice.onSpeechPartialResults = (event) => {
+      const text = event?.value?.[0] ?? '';
+      if (text) {
+        recognizedTextRef.current = text;
+        setInputText(text);
+      }
+    };
+
+    Voice.onSpeechEnd = () => {
+      setIsListening(false);
+      setVoiceModalVisible(false);
+      const finalText = recognizedTextRef.current;
+      if (finalText && finalText.trim()) {
+        sendMessage(finalText);
+      }
+    };
+
+    Voice.onSpeechError = () => {
+      setIsListening(false);
+      setVoiceModalVisible(false);
+    };
+
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners);
+    };
+  }, []);
+
   // TTS로 응답 읽기
   const speakResponse = async (text) => {
     if (!voiceEnabled) return;
@@ -101,6 +138,35 @@ export default function AIAssistantScreen({ navigation }) {
   const stopSpeaking = async () => {
     await Speech.stop();
     setIsSpeaking(false);
+  };
+
+  const startVoiceInputReal = async () => {
+    setVoiceModalVisible(true);
+    setIsListening(true);
+    Vibration.vibrate(50);
+
+    recognizedTextRef.current = '';
+    setInputText('');
+
+    try {
+      await Voice.start('ko-KR');
+    } catch (error) {
+      setIsListening(false);
+      setVoiceModalVisible(false);
+    }
+  };
+
+  const cancelVoiceInputReal = async () => {
+    setIsListening(false);
+    setVoiceModalVisible(false);
+    setInputText('');
+    recognizedTextRef.current = '';
+
+    try {
+      await Voice.cancel();
+    } catch (error) {
+      // noop
+    }
   };
 
   // 음성 입력 모달 열기
@@ -365,7 +431,7 @@ export default function AIAssistantScreen({ navigation }) {
             {/* 마이크 버튼 */}
             <TouchableOpacity 
               style={styles.micButton}
-              onPress={startVoiceInput}
+              onPress={startVoiceInputReal}
             >
               <Ionicons name="mic" size={22} color="#27AE60" />
             </TouchableOpacity>
@@ -393,7 +459,7 @@ export default function AIAssistantScreen({ navigation }) {
         visible={voiceModalVisible}
         animationType="fade"
         transparent={true}
-        onRequestClose={cancelVoiceInput}
+        onRequestClose={cancelVoiceInputReal}
       >
         <View style={styles.voiceModalOverlay}>
           <View style={styles.voiceModalContent}>
@@ -446,7 +512,7 @@ export default function AIAssistantScreen({ navigation }) {
             {/* 취소 버튼 */}
             <TouchableOpacity 
               style={styles.cancelVoiceButton}
-              onPress={cancelVoiceInput}
+              onPress={cancelVoiceInputReal}
             >
               <Text style={styles.cancelVoiceText}>취소</Text>
             </TouchableOpacity>
