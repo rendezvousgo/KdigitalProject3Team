@@ -98,12 +98,12 @@ function HomeTabs({ route, navigation }) {
       <Tab.Screen 
         name="HomeTab" 
         component={HomeScreen}
-        options={{ tabBarLabel: '吏?? }}
+        options={{ tabBarLabel: '지도' }}
       />
       <Tab.Screen 
         name="SearchTab" 
         component={SearchScreen}
-        options={{ tabBarLabel: '寃?? }}
+        options={{ tabBarLabel: '검색' }}
       />
       {/* ★☆ AI 탭을 정중앙에 배치 ★☆ */}
       <Tab.Screen 

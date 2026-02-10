@@ -1,8 +1,8 @@
-﻿/**
- * KakaoMapNative - Android??移댁뭅?ㅻ㏊ (react-native-webview 湲곕컲)
+/**
+ * KakaoMapNative - Android용 카카오맵 (react-native-webview 기반)
  * 
- * WebView ?덉뿉??移댁뭅?ㅻ㏊ JS SDK瑜?濡쒕뱶?섏뿬 吏?꾨? ?쒖떆?⑸땲??
- * 留덉빱 ?대┃, 吏???대룞 ?깆쓽 ?대깽?몃? postMessage濡?RN???꾨떖?⑸땲??
+ * WebView 안에서 카카오맵 JS SDK를 로드하여 지도를 표시합니다.
+ * 마커 클릭, 지도 이동 등의 이벤트를 postMessage로 RN에 전달합니다.
  */
 import React, { useRef, useImperativeHandle, forwardRef, useEffect, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
@@ -52,7 +52,7 @@ function generateHTML(lat, lng) {
         }, 300);
       });
 
-      // 珥덇린 idle
+      // 초기 idle
       var c = map.getCenter();
       window.ReactNativeWebView.postMessage(JSON.stringify({
         type: 'idle',
@@ -63,9 +63,9 @@ function generateHTML(lat, lng) {
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
     });
 
-    // RN?먯꽌 ?몄텧?섎뒗 ?⑥닔??
+    // RN에서 호출하는 함수들
     function updateMarkers(parkingsJSON) {
-      // 湲곗〈 留덉빱 ?쒓굅
+      // 기존 마커 제거
       for (var i = 0; i < markers.length; i++) {
         markers[i].setMap(null);
       }
@@ -112,7 +112,7 @@ function generateHTML(lat, lng) {
       });
       polyline.setMap(map);
 
-      // 異쒕컻 留덉빱
+      // 출발 마커
       startOverlay = new kakao.maps.CustomOverlay({
         position: linePath[0],
         content: '<div style="width:18px;height:18px;border-radius:50%;background:#3366FF;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>',
@@ -120,7 +120,7 @@ function generateHTML(lat, lng) {
       });
       startOverlay.setMap(map);
 
-      // ?꾩갑 留덉빱
+      // 도착 마커
       endOverlay = new kakao.maps.CustomOverlay({
         position: linePath[linePath.length - 1],
         content: '<div style="width:24px;height:24px;border-radius:50% 50% 50% 0;background:#E74C3C;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);transform:rotate(-45deg)"></div>',
@@ -128,7 +128,7 @@ function generateHTML(lat, lng) {
       });
       endOverlay.setMap(map);
 
-      // 寃쎈줈 ?곸뿭 留욎텛湲?
+      // 경로 영역 맞추기
       var bounds = new kakao.maps.LatLngBounds();
       linePath.forEach(function(p) { bounds.extend(p); });
       map.setBounds(bounds, 80, 80, 80, 80);
@@ -192,14 +192,14 @@ const KakaoMapNative = forwardRef(function KakaoMapNative(
     relayout: () => {},
   }));
 
-  // 留덉빱 ?낅뜲?댄듃
+  // 마커 업데이트
   useEffect(() => {
     if (!ready || !webViewRef.current) return;
     const json = JSON.stringify(parkings || []);
     webViewRef.current.injectJavaScript(`updateMarkers('${json.replace(/'/g, "\\'")}'); true;`);
   }, [parkings, ready]);
 
-  // 寃쎈줈 ?낅뜲?댄듃
+  // 경로 업데이트
   useEffect(() => {
     if (!ready || !webViewRef.current) return;
     if (routePath && routePath.length >= 2) {
@@ -210,7 +210,7 @@ const KakaoMapNative = forwardRef(function KakaoMapNative(
     }
   }, [routePath, ready]);
 
-  // center 蹂寃???panTo
+  // center 변경 시 panTo
   useEffect(() => {
     if (!ready || !webViewRef.current) return;
     webViewRef.current.injectJavaScript(`panTo(${center.latitude}, ${center.longitude}); true;`);
@@ -224,7 +224,7 @@ const KakaoMapNative = forwardRef(function KakaoMapNative(
       } else if (data.type === 'idle' && onMapIdle) {
         onMapIdle(data.lat, data.lng);
       } else if (data.type === 'markerClick' && onMarkerClick) {
-        // parkingsRef?먯꽌 ?먮낯 parking 媛앹껜瑜?李얠븘???꾨떖
+        // parkingsRef에서 원본 parking 객체를 찾아서 전달
         const p = parkingsRef.current?.[data.index] || data.parking;
         onMarkerClick(p);
       }
@@ -249,7 +249,7 @@ const KakaoMapNative = forwardRef(function KakaoMapNative(
         renderLoading={() => (
           <View style={styles.loading}>
             <ActivityIndicator size="large" color="#27AE60" />
-            <Text style={styles.loadingText}>移댁뭅?ㅻ㏊ 濡쒕뵫 以?..</Text>
+            <Text style={styles.loadingText}>카카오맵 로딩 중...</Text>
           </View>
         )}
       />

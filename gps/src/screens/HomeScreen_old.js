@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,17 +16,17 @@ import * as Speech from 'expo-speech';
 
 const { width, height } = Dimensions.get('window');
 
-// ?붾? ?곗씠??- ?섏쨷??API濡??泥?
+// 더미 데이터 - 나중에 API로 대체
 const DUMMY_CAMERAS = [
-  { id: 1, latitude: 37.5665, longitude: 126.9780, name: '?몄쥌?濡??⑥냽移대찓?? },
-  { id: 2, latitude: 37.5645, longitude: 126.9770, name: '?쒗룊濡??⑥냽移대찓?? },
-  { id: 3, latitude: 37.5685, longitude: 126.9800, name: '醫낅줈 ?⑥냽移대찓?? },
+  { id: 1, latitude: 37.5665, longitude: 126.9780, name: '세종대로 단속카메라' },
+  { id: 2, latitude: 37.5645, longitude: 126.9770, name: '태평로 단속카메라' },
+  { id: 3, latitude: 37.5685, longitude: 126.9800, name: '종로 단속카메라' },
 ];
 
 const DUMMY_PARKINGS = [
-  { id: 1, latitude: 37.5655, longitude: 126.9760, name: '?쒖껌 怨듭쁺二쇱감??, available: 23, total: 50, price: '10遺?500?? },
-  { id: 2, latitude: 37.5675, longitude: 126.9790, name: '?몄쥌臾명솕?뚭? 二쇱감??, available: 45, total: 100, price: '10遺?600?? },
-  { id: 3, latitude: 37.5640, longitude: 126.9810, name: '?꾨젅?ㅼ꽱??二쇱감??, available: 12, total: 80, price: '10遺?700?? },
+  { id: 1, latitude: 37.5655, longitude: 126.9760, name: '시청 공영주차장', available: 23, total: 50, price: '10분 500원' },
+  { id: 2, latitude: 37.5675, longitude: 126.9790, name: '세종문화회관 주차장', available: 45, total: 100, price: '10분 600원' },
+  { id: 3, latitude: 37.5640, longitude: 126.9810, name: '프레스센터 주차장', available: 12, total: 80, price: '10분 700원' },
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -43,32 +43,32 @@ export default function HomeScreen({ navigation }) {
     longitudeDelta: 0.01,
   });
 
-  // 珥덇린 二쇱감??寃??
+  // 초기 주차장 검색
   useEffect(() => {
     searchNearbyParkings(region.latitude, region.longitude);
   }, []);
 
-  // 二쇱감??寃???⑥닔
+  // 주차장 검색 함수
   const searchNearbyParkings = async (lat, lng) => {
     setLoading(true);
     try {
       const nearbyParkings = await findNearbyParkingLots(lat, lng, 2);
       setParkings(nearbyParkings);
-      console.log(`二쇰? 二쇱감??${nearbyParkings.length}媛?寃?됰맖`);
+      console.log(`주변 주차장 ${nearbyParkings.length}개 검색됨`);
     } catch (error) {
-      console.error('二쇱감??寃???ㅽ뙣:', error);
+      console.error('주차장 검색 실패:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 吏???대룞 ?꾨즺 ??二쇱감???ш???
+  // 지도 이동 완료 시 주차장 재검색
   const onRegionChangeComplete = (newRegion) => {
     setRegion(newRegion);
     searchNearbyParkings(newRegion.latitude, newRegion.longitude);
   };
 
-  // ?꾩튂 沅뚰븳 諛?珥덇린 ?꾩튂 ?ㅼ젙
+  // 위치 권한 및 초기 위치 설정
   useEffect(() => {
     if (Platform.OS === 'web') {
       setLocation({ latitude: 37.5665, longitude: 126.9780 });
@@ -90,7 +90,7 @@ export default function HomeScreen({ navigation }) {
     })();
   }, []);
 
-  // ?꾩튂 蹂寃???二쇰? 二쇱감??濡쒕뱶
+  // 위치 변경 시 주변 주차장 로드
   useEffect(() => {
     if (!location) return;
     
@@ -100,12 +100,12 @@ export default function HomeScreen({ navigation }) {
         const nearby = await findNearbyParkingLots(
           location.latitude, 
           location.longitude, 
-          2 // 2km 諛섍꼍
+          2 // 2km 반경
         );
         setParkings(nearby);
-        console.log(`二쇰? 二쇱감??${nearby.length}媛?濡쒕뱶??);
+        console.log(`주변 주차장 ${nearby.length}개 로드됨`);
       } catch (error) {
-        console.error('二쇱감??濡쒕뱶 ?ㅽ뙣:', error);
+        console.error('주차장 로드 실패:', error);
       } finally {
         setLoading(false);
       }
@@ -148,7 +148,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* 吏??- Google Maps (??+ 紐⑤컮???숈씪) */}
+      {/* 지도 - Google Maps (웹 + 모바일 동일) */}
       {Platform.OS === 'web' ? (
         <View style={styles.webMapContainer}>
           <iframe
@@ -165,7 +165,7 @@ export default function HomeScreen({ navigation }) {
           {loading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#27AE60" />
-              <Text style={styles.loadingText}>二쇱감??寃??以?..</Text>
+              <Text style={styles.loadingText}>주차장 검색 중...</Text>
             </View>
           )}
         </View>
@@ -179,13 +179,13 @@ export default function HomeScreen({ navigation }) {
           showsUserLocation
           showsMyLocationButton={false}
         >
-          {/* 二쇱감??留덉빱 - ?ㅼ젣 API ?곗씠??*/}
+          {/* 주차장 마커 - 실제 API 데이터 */}
           {parkings.map((parking) => (
             <Marker
               key={parking.id}
               coordinate={{ latitude: parking.lat, longitude: parking.lng }}
               title={parking.name}
-              description={`二쇱감 媛?? ${parking.capacity || '?'}?`}
+              description={`주차 가능: ${parking.capacity || '?'}대`}
               onPress={() => showBottomSheet(parking)}
               pinColor="#27AE60"
             />
@@ -193,27 +193,27 @@ export default function HomeScreen({ navigation }) {
         </MapView>
       )}
 
-      {/* 濡쒕뵫 ?몃뵒耳?댄꽣 */}
+      {/* 로딩 인디케이터 */}
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#27AE60" />
-          <Text style={styles.loadingText}>二쇰? 二쇱감??寃??以?..</Text>
+          <Text style={styles.loadingText}>주변 주차장 검색 중...</Text>
         </View>
       )}
 
-      {/* ?곷떒 寃?됰컮 */}
+      {/* 상단 검색바 */}
       <TouchableOpacity 
         style={styles.searchBar}
         onPress={() => navigation.navigate('Search')}
       >
         <Ionicons name="search" size={20} color="#666" />
-        <Text style={styles.searchText}>紐⑹쟻吏瑜?寃?됲븯?몄슂</Text>
+        <Text style={styles.searchText}>목적지를 검색하세요</Text>
         <View style={styles.aiButton}>
           <Text style={styles.aiButtonText}>AI</Text>
         </View>
       </TouchableOpacity>
 
-      {/* ?곗륫 踰꾪듉??*/}
+      {/* 우측 버튼들 */}
       <View style={styles.rightButtons}>
         <TouchableOpacity style={styles.mapButton} onPress={goToMyLocation}>
           <MaterialIcons name="my-location" size={24} color="#007AFF" />
@@ -226,19 +226,19 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* ?섎떒 鍮좊Ⅸ ?≪뀡 */}
+      {/* 하단 빠른 액션 */}
       <View style={styles.quickActions}>
         <TouchableOpacity style={styles.quickActionButton}>
           <View style={[styles.quickActionIcon, { backgroundColor: '#E8F8EE' }]}>
             <FontAwesome5 name="parking" size={18} color="#27AE60" />
           </View>
-          <Text style={styles.quickActionText}>二쇰? 二쇱감??/Text>
+          <Text style={styles.quickActionText}>주변 주차장</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.quickActionButton}>
           <View style={[styles.quickActionIcon, { backgroundColor: '#FDEEEE' }]}>
             <MaterialIcons name="videocam" size={18} color="#E74C3C" />
           </View>
-          <Text style={styles.quickActionText}>?⑥냽移대찓??/Text>
+          <Text style={styles.quickActionText}>단속카메라</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.quickActionButton}
@@ -247,11 +247,11 @@ export default function HomeScreen({ navigation }) {
           <View style={[styles.quickActionIcon, { backgroundColor: '#F0F0F8' }]}>
             <Ionicons name="sparkles" size={18} color="#1A1A2E" />
           </View>
-          <Text style={styles.quickActionText}>AI 異붿쿇</Text>
+          <Text style={styles.quickActionText}>AI 추천</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 二쇱감???곸꽭 諛뷀??쒗듃 */}
+      {/* 주차장 상세 바텀시트 */}
       {selectedParking && (
         <TouchableOpacity 
           style={styles.overlay} 
@@ -278,7 +278,7 @@ export default function HomeScreen({ navigation }) {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.parkingName}>{selectedParking.name}</Text>
                     <Text style={styles.parkingAddress}>{selectedParking.address}</Text>
-                    <Text style={styles.parkingPrice}>{selectedParking.fee || '?붽툑?뺣낫 ?놁쓬'}</Text>
+                    <Text style={styles.parkingPrice}>{selectedParking.fee || '요금정보 없음'}</Text>
                   </View>
                   {selectedParking.distance && (
                     <View style={styles.distanceBadge}>
@@ -293,7 +293,7 @@ export default function HomeScreen({ navigation }) {
                 <View style={styles.parkingDetails}>
                   <View style={styles.detailRow}>
                     <MaterialIcons name="local-parking" size={18} color="#666" />
-                    <Text style={styles.detailText}>二쇱감援ы쉷: {selectedParking.capacity}?</Text>
+                    <Text style={styles.detailText}>주차구획: {selectedParking.capacity}대</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <MaterialIcons name="access-time" size={18} color="#666" />
@@ -310,11 +310,11 @@ export default function HomeScreen({ navigation }) {
                 <View style={styles.parkingActions}>
                   <TouchableOpacity style={styles.parkingActionButton}>
                     <MaterialIcons name="directions" size={24} color="#fff" />
-                    <Text style={styles.parkingActionText}>寃쎈줈 ?덈궡</Text>
+                    <Text style={styles.parkingActionText}>경로 안내</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.parkingActionButton, styles.secondaryButton]}>
                     <MaterialIcons name="favorite-border" size={24} color="#007AFF" />
-                    <Text style={[styles.parkingActionText, styles.secondaryButtonText]}>利먭꺼李얘린</Text>
+                    <Text style={[styles.parkingActionText, styles.secondaryButtonText]}>즐겨찾기</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  // ?뱀슜 ?ㅽ???
+  // 웹용 스타일
   webMapContainer: {
     flex: 1,
     position: 'relative',

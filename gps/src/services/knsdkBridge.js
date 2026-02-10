@@ -1,70 +1,70 @@
-﻿/**
- * KNSDK ?ㅼ씠?곕툕 紐⑤뱢 釉뚮┸吏
+/**
+ * KNSDK 네이티브 모듈 브릿지
  * 
  * Android: NativeModules.KNSDKModule (Kotlin)
- * Web: 移댁뭅?ㅻ㏊ ??留곹겕濡??대갚
+ * Web: 카카오맵 웹 링크로 폴백
  */
 import { NativeModules, Platform, Linking } from 'react-native';
 
 const { KNSDKModule } = NativeModules || {};
 
 /**
- * KNSDK 珥덇린??(Android留?
- * ???쒖옉 ???쒕쾲 ?몄텧
+ * KNSDK 초기화 (Android만)
+ * 앱 시작 시 한번 호출
  * @returns {{ success: boolean, error?: string }}
  */
 export async function initKNSDK() {
   if (Platform.OS !== 'android' || !KNSDKModule) {
-    console.log('KNSDK: ??iOS?먯꽌???ъ슜 遺덇?, ???대갚 ?ъ슜');
-    return { success: false, error: '??iOS 誘몄??? };
+    console.log('KNSDK: 웹/iOS에서는 사용 불가, 웹 폴백 사용');
+    return { success: false, error: '웹/iOS 미지원' };
   }
 
   try {
     const result = await KNSDKModule.initialize();
-    console.log('KNSDK 珥덇린??', result);
+    console.log('KNSDK 초기화:', result);
     return { success: true };
   } catch (error) {
-    console.error('KNSDK 珥덇린???ㅽ뙣:', error.message || error);
+    console.error('KNSDK 초기화 실패:', error.message || error);
     return { success: false, error: error.message || String(error) };
   }
 }
 
 /**
- * 3D ?대퉬寃뚯씠???쒖옉
+ * 3D 내비게이션 시작
  * 
- * Android: KNSDK 3D ?대퉬 ?붾㈃
- * Web: 移댁뭅?ㅻ㏊ 湲몄갼湲?????
+ * Android: KNSDK 3D 내비 화면
+ * Web: 카카오맵 길찾기 새 탭
  * 
- * @param {number} destLat - 紐⑹쟻吏 ?꾨룄
- * @param {number} destLng - 紐⑹쟻吏 寃쎈룄
- * @param {string} destName - 紐⑹쟻吏 ?대쫫
+ * @param {number} destLat - 목적지 위도
+ * @param {number} destLng - 목적지 경도
+ * @param {string} destName - 목적지 이름
  */
 export async function startNavigation(destLat, destLng, destName, startLat, startLng) {
-  // Android: KNSDK 3D ?대퉬
+  // Android: KNSDK 3D 내비
   if (Platform.OS === 'android' && KNSDKModule) {
     try {
       const result = await KNSDKModule.startNavi(
         destLat, destLng, destName,
         startLat || 0, startLng || 0
       );
-      console.log('?대퉬 ?쒖옉:', result);
+      console.log('내비 시작:', result);
       return { success: true, method: 'knsdk' };
     } catch (error) {
-      console.error('KNSDK ?대퉬 ?ㅽ뙣, ???대갚:', error);
-      // KNSDK ?ㅽ뙣 ??移댁뭅?ㅻ㏊ ?깆쑝濡??대갚
+      console.error('KNSDK 내비 실패, 웹 폴백:', error);
+      // KNSDK 실패 시 카카오맵 앱으로 폴백
       return openKakaoMapFallback(destLat, destLng, destName);
     }
   }
 
-  // Web / iOS: 移댁뭅?ㅻ㏊ ??留곹겕
+  // Web / iOS: 카카오맵 웹 링크
   return openKakaoMapFallback(destLat, destLng, destName);
 }
 
 /**
- * ?대갚: 移댁뭅?ㅻ㏊ ?????닿린
+ * 폴백: 카카오맵 웹/앱 열기
  */
 async function openKakaoMapFallback(destLat, destLng, destName) {
-  const encodedName = encodeURIComponent(destName || '紐⑹쟻吏');
+  const encodedName = encodeURIComponent(destName || '목적지');
 
   if (Platform.OS === 'web') {
     const url = `https://map.kakao.com/link/to/${encodedName},${destLat},${destLng}`;
@@ -72,7 +72,7 @@ async function openKakaoMapFallback(destLat, destLng, destName) {
     return { success: true, method: 'web' };
   }
 
-  // 紐⑤컮?? 移댁뭅?ㅻ㏊ ??URL Scheme
+  // 모바일: 카카오맵 앱 URL Scheme
   const kakaoMapUrl = `kakaomap://route?sp=&ep=${destLat},${destLng}&by=CAR`;
   const webUrl = `https://map.kakao.com/link/to/${encodedName},${destLat},${destLng}`;
 
@@ -91,7 +91,7 @@ async function openKakaoMapFallback(destLat, destLng, destName) {
 }
 
 /**
- * KNSDK 珥덇린???곹깭 ?뺤씤
+ * KNSDK 초기화 상태 확인
  */
 export async function isKNSDKReady() {
   if (Platform.OS !== 'android' || !KNSDKModule) return false;
@@ -103,7 +103,7 @@ export async function isKNSDKReady() {
 }
 
 /**
- * KNSDK ?곹깭 ?곸꽭 議고쉶 (?붾쾭洹몄슜)
+ * KNSDK 상태 상세 조회 (디버그용)
  * @returns {{ initialized: boolean, error: string|null }}
  */
 export async function getKNSDKStatus() {
@@ -118,8 +118,8 @@ export async function getKNSDKStatus() {
 }
 
 /**
- * ?고??????댁떆 議고쉶 (?붾쾭源낆슜)
- * ?깆쓽 ?ㅼ젣 ?쒕챸 ???댁떆瑜?媛?몄???移댁뭅??肄섏넄???깅줉???댁떆? 鍮꾧탳
+ * 런타임 키 해시 조회 (디버깅용)
+ * 앱의 실제 서명 키 해시를 가져와서 카카오 콘솔에 등록된 해시와 비교
  * @returns {{ packageName: string, keyHashes: string[], registeredHash: string }}
  */
 export async function getKeyHash() {
@@ -129,7 +129,7 @@ export async function getKeyHash() {
   try {
     return await KNSDKModule.getKeyHash();
   } catch (e) {
-    console.error('???댁떆 議고쉶 ?ㅽ뙣:', e);
+    console.error('키 해시 조회 실패:', e);
     return null;
   }
 }

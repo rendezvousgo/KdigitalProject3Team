@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ export default function SearchScreen({ navigation, route }) {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'parking'
   const userLocation = route?.params?.location || null;
 
-  // ?붾컮?댁뒪 寃??
+  // 디바운스 검색
   useEffect(() => {
     if (searchText.length < 2) {
       setResults([]);
@@ -37,29 +37,29 @@ export default function SearchScreen({ navigation, route }) {
     setSearching(true);
     try {
       if (activeTab === 'parking') {
-        // 怨듭쁺二쇱감?λ쭔 寃??
+        // 공영주차장만 검색
         const parkingResults = await searchParkingByName(keyword);
         setResults(parkingResults);
       } else {
-        // ?μ냼 + 二쇱감???숈떆 寃??
+        // 장소 + 주차장 동시 검색
         const [placeResults, parkingResults] = await Promise.all([
           searchPlaces(keyword, userLocation?.latitude, userLocation?.longitude),
           searchParkingByName(keyword),
         ]);
-        // 二쇱감??癒쇱?, ?μ냼 ?섏쨷??
+        // 주차장 먼저, 장소 나중에
         setResults([...parkingResults.slice(0, 5), ...placeResults]);
       }
     } catch (error) {
-      console.error('寃???ㅻ쪟:', error);
+      console.error('검색 오류:', error);
     } finally {
       setSearching(false);
     }
   };
 
   const handleSelectResult = (item) => {
-    // eventBus濡?HomeScreen??吏곸젒 紐⑹쟻吏 ?꾨떖 (navigation params ?고쉶)
+    // eventBus로 HomeScreen에 직접 목적지 전달 (navigation params 우회)
     emit('navigateToDestination', item);
-    // Home ?붾㈃??HomeTab?쇰줈 ?대룞 (Stack modal ?リ린 + Tab ?꾪솚)
+    // Home 화면의 HomeTab으로 이동 (Stack modal 닫기 + Tab 전환)
     const rootNav = navigation.getParent?.() || navigation;
     rootNav.navigate('Home', { screen: 'HomeTab' });
   };
@@ -84,7 +84,7 @@ export default function SearchScreen({ navigation, route }) {
           <Text style={styles.resultName} numberOfLines={1}>{item.name}</Text>
           {item.type === 'parking' && (
             <View style={styles.parkingBadge}>
-              <Text style={styles.parkingBadgeText}>怨듭쁺</Text>
+              <Text style={styles.parkingBadgeText}>공영</Text>
             </View>
           )}
           {item.category ? (
@@ -108,7 +108,7 @@ export default function SearchScreen({ navigation, route }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        {/* ?곷떒 寃?됰컮 */}
+        {/* 상단 검색바 */}
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -120,7 +120,7 @@ export default function SearchScreen({ navigation, route }) {
             <Ionicons name="search" size={20} color="#999" />
             <TextInput
               style={styles.searchInput}
-              placeholder="紐⑹쟻吏 ?먮뒗 二쇱감??寃??
+              placeholder="목적지 또는 주차장 검색"
               placeholderTextColor="#999"
               value={searchText}
               onChangeText={setSearchText}
@@ -135,24 +135,24 @@ export default function SearchScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* ???꾪꽣 */}
+        {/* 탭 필터 */}
         <View style={styles.tabRow}>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'all' && styles.tabActive]}
             onPress={() => setActiveTab('all')}
           >
-            <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>?꾩껜</Text>
+            <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>전체</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'parking' && styles.tabActive]}
             onPress={() => setActiveTab('parking')}
           >
             <FontAwesome5 name="parking" size={12} color={activeTab === 'parking' ? '#fff' : '#27AE60'} style={{ marginRight: 4 }} />
-            <Text style={[styles.tabText, activeTab === 'parking' && styles.tabTextActive]}>怨듭쁺二쇱감??/Text>
+            <Text style={[styles.tabText, activeTab === 'parking' && styles.tabTextActive]}>공영주차장</Text>
           </TouchableOpacity>
         </View>
 
-        {/* AI 異붿쿇 諛곕꼫 */}
+        {/* AI 추천 배너 */}
         {searchText.length === 0 && (
           <TouchableOpacity 
             style={styles.aiBanner}
@@ -162,18 +162,18 @@ export default function SearchScreen({ navigation, route }) {
               <Ionicons name="sparkles" size={20} color="#fff" />
             </View>
             <View style={styles.aiBannerText}>
-              <Text style={styles.aiBannerTitle}>AI?먭쾶 臾쇱뼱蹂닿린</Text>
-              <Text style={styles.aiBannerSubtitle}>"?쒖껌 洹쇱쿂 ?⑥냽 ?녿뒗 二쇱감??異붿쿇?댁쨾"</Text>
+              <Text style={styles.aiBannerTitle}>AI에게 물어보기</Text>
+              <Text style={styles.aiBannerSubtitle}>"시청 근처 단속 없는 주차장 추천해줘"</Text>
             </View>
             <MaterialIcons name="chevron-right" size={24} color="#5856D6" />
           </TouchableOpacity>
         )}
 
-        {/* 寃??寃곌낵 */}
+        {/* 검색 결과 */}
         {searching ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#27AE60" />
-            <Text style={styles.loadingText}>寃??以?..</Text>
+            <Text style={styles.loadingText}>검색 중...</Text>
           </View>
         ) : results.length > 0 ? (
           <FlatList
@@ -186,35 +186,35 @@ export default function SearchScreen({ navigation, route }) {
         ) : searchText.length >= 2 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="search-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyText}>寃??寃곌낵媛 ?놁뒿?덈떎</Text>
+            <Text style={styles.emptyText}>검색 결과가 없습니다</Text>
           </View>
         ) : (
           <View style={styles.section}>
-            {/* 鍮좊Ⅸ 移댄뀒怨좊━ */}
+            {/* 빠른 카테고리 */}
             <View style={styles.categories}>
-              <TouchableOpacity style={styles.categoryButton} onPress={() => setSearchText('二쇱감??)}>
+              <TouchableOpacity style={styles.categoryButton} onPress={() => setSearchText('주차장')}>
                 <View style={[styles.categoryIcon, { backgroundColor: '#E8F5E9' }]}>
                   <FontAwesome5 name="parking" size={18} color="#34C759" />
                 </View>
-                <Text style={styles.categoryBtnText}>二쇰? 二쇱감??/Text>
+                <Text style={styles.categoryBtnText}>주변 주차장</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.categoryButton} onPress={() => setSearchText('二쇱쑀??)}>
+              <TouchableOpacity style={styles.categoryButton} onPress={() => setSearchText('주유소')}>
                 <View style={[styles.categoryIcon, { backgroundColor: '#FFF3E0' }]}>
                   <MaterialIcons name="local-gas-station" size={18} color="#FF9500" />
                 </View>
-                <Text style={styles.categoryBtnText}>二쇱쑀??/Text>
+                <Text style={styles.categoryBtnText}>주유소</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.categoryButton} onPress={() => setSearchText('異⑹쟾??)}>
+              <TouchableOpacity style={styles.categoryButton} onPress={() => setSearchText('충전소')}>
                 <View style={[styles.categoryIcon, { backgroundColor: '#E3F2FD' }]}>
                   <MaterialIcons name="ev-station" size={18} color="#007AFF" />
                 </View>
-                <Text style={styles.categoryBtnText}>異⑹쟾??/Text>
+                <Text style={styles.categoryBtnText}>충전소</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.categoryButton} onPress={() => setSearchText('蹂묒썝')}>
+              <TouchableOpacity style={styles.categoryButton} onPress={() => setSearchText('병원')}>
                 <View style={[styles.categoryIcon, { backgroundColor: '#FFEBEE' }]}>
                   <MaterialIcons name="local-hospital" size={18} color="#FF3B30" />
                 </View>
-                <Text style={styles.categoryBtnText}>蹂묒썝</Text>
+                <Text style={styles.categoryBtnText}>병원</Text>
               </TouchableOpacity>
             </View>
           </View>

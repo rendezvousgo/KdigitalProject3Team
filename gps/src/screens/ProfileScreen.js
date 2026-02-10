@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -22,15 +22,15 @@ export default function ProfileScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* ?ㅻ뜑 */}
+        {/* 헤더 */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>留덉씠?섏씠吏</Text>
+          <Text style={styles.headerTitle}>마이페이지</Text>
           <TouchableOpacity>
             <Ionicons name="settings-outline" size={24} color="#000" />
           </TouchableOpacity>
         </View>
 
-        {/* ?꾨줈??移대뱶 */}
+        {/* 프로필 카드 */}
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
@@ -40,43 +40,43 @@ export default function ProfileScreen({ navigation }) {
               <Ionicons name="camera" size={14} color="#fff" />
             </View>
           </View>
-          <Text style={styles.userName}>?띻만??/Text>
+          <Text style={styles.userName}>홍길동</Text>
           <Text style={styles.userEmail}>safeparking_user@email.com</Text>
           <View style={styles.memberBadge}>
             <Ionicons name="shield-checkmark" size={14} color="#FFD700" />
-            <Text style={styles.memberBadgeText}>?덉쟾?댁쟾 ?뚯썝</Text>
+            <Text style={styles.memberBadgeText}>안전운전 회원</Text>
           </View>
         </View>
 
-        {/* ?듦퀎 移대뱶 */}
+        {/* 통계 카드 */}
         <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>?몄씠?꾪뙆?밴낵 ?④퍡??湲곕줉</Text>
+          <Text style={styles.statsTitle}>세이프파킹과 함께한 기록</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>??userStats.savedMoney.toLocaleString()}</Text>
-              <Text style={styles.statLabel}>?덉빟??怨쇳깭猷?/Text>
+              <Text style={styles.statValue}>₩{userStats.savedMoney.toLocaleString()}</Text>
+              <Text style={styles.statLabel}>절약한 과태료</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userStats.avoidedTickets}??/Text>
-              <Text style={styles.statLabel}>?⑥냽 ?뚰뵾</Text>
+              <Text style={styles.statValue}>{userStats.avoidedTickets}회</Text>
+              <Text style={styles.statLabel}>단속 회피</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userStats.totalParks}??/Text>
-              <Text style={styles.statLabel}>?덉쟾 二쇱감</Text>
+              <Text style={styles.statValue}>{userStats.totalParks}회</Text>
+              <Text style={styles.statLabel}>안전 주차</Text>
             </View>
           </View>
         </View>
 
-        {/* 硫붾돱 ?뱀뀡 */}
+        {/* 메뉴 섹션 */}
         <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>二쇱감 湲곕줉</Text>
+          <Text style={styles.menuSectionTitle}>주차 기록</Text>
           <TouchableOpacity style={styles.menuItem}>
             <View style={[styles.menuIcon, { backgroundColor: '#E3F2FD' }]}>
               <MaterialIcons name="history" size={22} color="#007AFF" />
             </View>
-            <Text style={styles.menuText}>二쇱감 ?대젰</Text>
+            <Text style={styles.menuText}>주차 이력</Text>
             <View style={styles.menuBadge}>
               <Text style={styles.menuBadgeText}>24</Text>
             </View>
@@ -86,47 +86,47 @@ export default function ProfileScreen({ navigation }) {
             <View style={[styles.menuIcon, { backgroundColor: '#FFF3E0' }]}>
               <Ionicons name="star" size={22} color="#FF9500" />
             </View>
-            <Text style={styles.menuText}>?먯＜ 媛??二쇱감??/Text>
+            <Text style={styles.menuText}>자주 가는 주차장</Text>
             <MaterialIcons name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem}>
             <View style={[styles.menuIcon, { backgroundColor: '#FFEBEE' }]}>
               <MaterialIcons name="warning" size={22} color="#FF3B30" />
             </View>
-            <Text style={styles.menuText}>?⑥냽 ?꾪뿕 ?뚮┝ ?댁뿭</Text>
+            <Text style={styles.menuText}>단속 위험 알림 내역</Text>
             <MaterialIcons name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
         </View>
 
         <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>?ㅼ젙</Text>
+          <Text style={styles.menuSectionTitle}>설정</Text>
           <TouchableOpacity style={styles.menuItem}>
             <View style={[styles.menuIcon, { backgroundColor: '#E8F5E9' }]}>
               <Ionicons name="notifications" size={22} color="#34C759" />
             </View>
-            <Text style={styles.menuText}>?뚮┝ ?ㅼ젙</Text>
+            <Text style={styles.menuText}>알림 설정</Text>
             <MaterialIcons name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem}>
             <View style={[styles.menuIcon, { backgroundColor: '#F3E5F5' }]}>
               <Ionicons name="car" size={22} color="#9C27B0" />
             </View>
-            <Text style={styles.menuText}>??李⑤웾 ?뺣낫</Text>
+            <Text style={styles.menuText}>내 차량 정보</Text>
             <MaterialIcons name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem}>
             <View style={[styles.menuIcon, { backgroundColor: '#F5F5F5' }]}>
               <Ionicons name="help-circle" size={22} color="#666" />
             </View>
-            <Text style={styles.menuText}>?꾩?留?/ FAQ</Text>
+            <Text style={styles.menuText}>도움말 / FAQ</Text>
             <MaterialIcons name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
         </View>
 
-        {/* ???뺣낫 */}
+        {/* 앱 정보 */}
         <View style={styles.appInfo}>
           <Text style={styles.appVersion}>SafeParking v1.0.0</Text>
-          <Text style={styles.appCopyright}>짤 2026 ?몃━耳?쇳넲?ㅽ?</Text>
+          <Text style={styles.appCopyright}>© 2026 트리케라톱스팀</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

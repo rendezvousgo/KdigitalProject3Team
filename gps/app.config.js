@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   name: 'SafeParking',
   slug: 'safe-parking',
   version: '1.0.0',
