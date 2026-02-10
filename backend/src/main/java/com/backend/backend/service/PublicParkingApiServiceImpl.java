@@ -1,4 +1,4 @@
-﻿package com.backend.backend.service;
+package com.backend.backend.service;
 
 import com.backend.backend.config.ParkingApiProperties;
 import com.backend.backend.dto.ParkingCandidateDto;
@@ -24,7 +24,7 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
         this.objectMapper = new ObjectMapper();
     }
 
-    // 공공 주차장 API를 호출해 사용자 좌표 기준 가장 가까운 주차장을 찾아 반환한다.
+    // 怨듦났 二쇱감??API瑜??몄텧???ъ슜??醫뚰몴 湲곗? 媛??媛源뚯슫 二쇱감?μ쓣 李얠븘 諛섑솚?쒕떎.
     @Override
     public ParkingCandidateDto findNearestParking(double userLatitude, double userLongitude) {
         System.out.println("Parking API baseUrl = " + parkingApiProperties.getBaseUrl());
@@ -52,9 +52,9 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
             if (dataArray != null && dataArray.isArray()) {
                 for (JsonNode item : dataArray) {
 
-                    String name = getTextByKeys(item, "주차장명", "parkingName", "pkltNm", "prkplceNm");
-                    Double latitude = getDoubleByKeys(item, "위도", "lat", "latitude", "laCrdnt", "y");
-                    Double longitude = getDoubleByKeys(item, "경도", "lot", "longitude", "loCrdnt", "x");
+                    String name = getTextByKeys(item, "二쇱감?λ챸", "parkingName", "pkltNm", "prkplceNm");
+                    Double latitude = getDoubleByKeys(item, "?꾨룄", "lat", "latitude", "laCrdnt", "y");
+                    Double longitude = getDoubleByKeys(item, "寃쎈룄", "lot", "longitude", "loCrdnt", "x");
 
                     if (!StringUtils.hasText(name) || latitude == null || longitude == null) {
                         continue;
@@ -74,13 +74,13 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
             e.printStackTrace();
             throw new IllegalStateException("Failed to fetch public parking data.", e);
         } catch (Exception e) {
-            e.printStackTrace(); // 여기서 서버 콘솔에 원인 출력
+            e.printStackTrace(); // ?ш린???쒕쾭 肄섏넄???먯씤 異쒕젰
             throw new IllegalStateException("Failed to fetch public parking data.", e);
         }
 
     }
 
-    // 응답 JSON에서 실제 데이터 배열 필드명(data/records/items)을 찾아 반환한다.
+    // ?묐떟 JSON?먯꽌 ?ㅼ젣 ?곗씠??諛곗뿴 ?꾨뱶紐?data/records/items)??李얠븘 諛섑솚?쒕떎.
     private JsonNode resolveDataArray(JsonNode root) {
         if (root == null) {
             return null;
@@ -97,7 +97,7 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
         return null;
     }
 
-    // 여러 키 후보 중 텍스트 값을 찾아 반환한다(없으면 null).
+    // ?щ윭 ???꾨낫 以??띿뒪??媛믪쓣 李얠븘 諛섑솚?쒕떎(?놁쑝硫?null).
     private String getTextByKeys(JsonNode node, String... keys) {
         for (String key : keys) {
             if (node.has(key) && !node.get(key).isNull()) {
@@ -110,7 +110,7 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
         return null;
     }
 
-    // 여러 키 후보 중 숫자 값을 찾아 Double로 반환한다(파싱 실패 시 다음 키 시도).
+    // ?щ윭 ???꾨낫 以??レ옄 媛믪쓣 李얠븘 Double濡?諛섑솚?쒕떎(?뚯떛 ?ㅽ뙣 ???ㅼ쓬 ???쒕룄).
     private Double getDoubleByKeys(JsonNode node, String... keys) {
         for (String key : keys) {
             if (node.has(key) && !node.get(key).isNull()) {
@@ -128,7 +128,7 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
         return null;
     }
 
-    // 두 좌표 간의 대략적인 거리(미터)를 Haversine 공식으로 계산한다.
+    // ??醫뚰몴 媛꾩쓽 ??듭쟻??嫄곕━(誘명꽣)瑜?Haversine 怨듭떇?쇰줈 怨꾩궛?쒕떎.
     private double calculateDistanceMeters(double lat1, double lon1, double lat2, double lon2) {
         double earthRadius = 6371000.0;
         double dLat = Math.toRadians(lat2 - lat1);
@@ -142,3 +142,4 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
         return earthRadius * c;
     }
 }
+

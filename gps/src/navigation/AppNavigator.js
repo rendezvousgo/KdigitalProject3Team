@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -17,10 +17,10 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function HomeTabs({ route, navigation }) {
-  // Stack에서 전달된 params를 Tab 내부 HomeScreen에 전달
+  // Stack?먯꽌 ?꾨떖??params瑜?Tab ?대? HomeScreen???꾨떖
   React.useEffect(() => {
     if (route?.params?.destination && route?.params?.timestamp) {
-      // HomeTab으로 직접 navigate하여 params 전달
+      // HomeTab?쇰줈 吏곸젒 navigate?섏뿬 params ?꾨떖
       navigation.navigate('HomeTab', {
         destination: route.params.destination,
         timestamp: route.params.timestamp,
@@ -81,27 +81,27 @@ function HomeTabs({ route, navigation }) {
       <Tab.Screen 
         name="HomeTab" 
         component={HomeScreen}
-        options={{ tabBarLabel: '지도' }}
+        options={{ tabBarLabel: '吏?? }}
       />
       <Tab.Screen 
         name="SearchTab" 
         component={SearchScreen}
-        options={{ tabBarLabel: '검색' }}
+        options={{ tabBarLabel: '寃?? }}
       />
       <Tab.Screen 
         name="AITab" 
         component={AIAssistantScreen}
-        options={{ tabBarLabel: 'AI 추천' }}
+        options={{ tabBarLabel: 'AI 異붿쿇' }}
       />
       <Tab.Screen 
         name="CommunityTab" 
         component={CommunityScreen}
-        options={{ tabBarLabel: '커뮤니티' }}
+        options={{ tabBarLabel: '而ㅻ??덊떚' }}
       />
       <Tab.Screen 
         name="ProfileTab" 
         component={ProfileScreen}
-        options={{ tabBarLabel: '마이' }}
+        options={{ tabBarLabel: '留덉씠' }}
       />
     </Tab.Navigator>
   );

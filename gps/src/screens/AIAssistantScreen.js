@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,21 +17,21 @@ import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 import Voice from '@react-native-voice/voice';
 
-// 더미 AI 대화
+// ?붾? AI ???
 const INITIAL_MESSAGES = [
   {
     id: 1,
     type: 'ai',
-    text: '안녕하세요, 세이프파킹입니다.\n\n목적지 주변의 단속 현황과 안전한 주차 공간을 안내해 드릴게요. 어디로 가시나요?',
-    time: '방금',
+    text: '?덈뀞?섏꽭?? ?몄씠?꾪뙆?뱀엯?덈떎.\n\n紐⑹쟻吏 二쇰????⑥냽 ?꾪솴怨??덉쟾??二쇱감 怨듦컙???덈궡???쒕┫寃뚯슂. ?대뵒濡?媛?쒕굹??',
+    time: '諛⑷툑',
   },
 ];
 
 const QUICK_QUESTIONS = [
-  '시청 근처 주차장 추천',
-  '가까운 무료 주차장',
-  '단속 없는 안전 구역',
-  '30분 단기 주차',
+  '?쒖껌 洹쇱쿂 二쇱감??異붿쿇',
+  '媛源뚯슫 臾대즺 二쇱감??,
+  '?⑥냽 ?녿뒗 ?덉쟾 援ъ뿭',
+  '30遺??④린 二쇱감',
 ];
 
 export default function AIAssistantScreen({ navigation }) {
@@ -59,7 +59,7 @@ export default function AIAssistantScreen({ navigation }) {
     }
   }, [isTyping]);
 
-  // 음성 듣기 애니메이션
+  // ?뚯꽦 ?ｊ린 ?좊땲硫붿씠??
   useEffect(() => {
     if (isListening) {
       Animated.loop(
@@ -80,7 +80,7 @@ export default function AIAssistantScreen({ navigation }) {
     }
   }, [isListening]);
 
-  // STT ?대깽???몃━?⑥씠??
+  // STT ??源???紐꺿봺??μ뵠??
   useEffect(() => {
     Voice.onSpeechResults = (event) => {
       const text = event?.value?.[0] ?? '';
@@ -115,7 +115,7 @@ export default function AIAssistantScreen({ navigation }) {
     };
   }, []);
 
-  // TTS로 응답 읽기
+  // TTS濡??묐떟 ?쎄린
   const speakResponse = async (text) => {
     if (!voiceEnabled) return;
     
@@ -134,7 +134,7 @@ export default function AIAssistantScreen({ navigation }) {
     }
   };
 
-  // TTS 중지
+  // TTS 以묒?
   const stopSpeaking = async () => {
     await Speech.stop();
     setIsSpeaking(false);
@@ -169,25 +169,25 @@ export default function AIAssistantScreen({ navigation }) {
     }
   };
 
-  // 음성 입력 모달 열기
+  // ?뚯꽦 ?낅젰 紐⑤떖 ?닿린
   const startVoiceInput = () => {
     setVoiceModalVisible(true);
     setIsListening(true);
     Vibration.vibrate(50);
     
-    // 실제로는 여기서 STT 시작
-    // 데모: 3초 후 자동으로 인식된 텍스트 시뮬레이션
+    // ?ㅼ젣濡쒕뒗 ?ш린??STT ?쒖옉
+    // ?곕え: 3珥????먮룞?쇰줈 ?몄떇???띿뒪???쒕??덉씠??
     setTimeout(() => {
       simulateVoiceRecognition();
     }, 3000);
   };
 
-  // 음성 인식 시뮬레이션 (실제로는 STT API 연동)
+  // ?뚯꽦 ?몄떇 ?쒕??덉씠??(?ㅼ젣濡쒕뒗 STT API ?곕룞)
   const simulateVoiceRecognition = () => {
     const demoTexts = [
-      '강남역 근처 30분 주차할 곳 찾아줘',
-      '여기서 가장 가까운 무료 주차장 알려줘',
-      '단속 없는 안전한 곳으로 안내해줘',
+      '媛뺣궓??洹쇱쿂 30遺?二쇱감??怨?李얠븘以?,
+      '?ш린??媛??媛源뚯슫 臾대즺 二쇱감???뚮젮以?,
+      '?⑥냽 ?녿뒗 ?덉쟾??怨녹쑝濡??덈궡?댁쨾',
     ];
     const randomText = demoTexts[Math.floor(Math.random() * demoTexts.length)];
     
@@ -200,7 +200,7 @@ export default function AIAssistantScreen({ navigation }) {
     }, 500);
   };
 
-  // 음성 입력 취소
+  // ?뚯꽦 ?낅젰 痍⑥냼
   const cancelVoiceInput = () => {
     setIsListening(false);
     setVoiceModalVisible(false);
@@ -214,20 +214,20 @@ export default function AIAssistantScreen({ navigation }) {
       id: messages.length + 1,
       type: 'user',
       text: text,
-      time: '방금',
+      time: '諛⑷툑',
     };
 
     setMessages([...messages, userMessage]);
     setInputText('');
     setIsTyping(true);
 
-    // AI 응답 시뮬레이션
+    // AI ?묐떟 ?쒕??덉씠??
     setTimeout(() => {
       setIsTyping(false);
       const aiResponse = generateAIResponse(text);
       setMessages(prev => [...prev, aiResponse]);
       
-      // TTS로 응답 읽기
+      // TTS濡??묐떟 ?쎄린
       if (voiceEnabled) {
         speakResponse(aiResponse.text);
       }
@@ -235,33 +235,33 @@ export default function AIAssistantScreen({ navigation }) {
   };
 
   const generateAIResponse = (userText) => {
-    // 간단한 응답 로직 (실제로는 API 연동)
+    // 媛꾨떒???묐떟 濡쒖쭅 (?ㅼ젣濡쒕뒗 API ?곕룞)
     let response = '';
     let recommendations = null;
 
-    if (userText.includes('시청') || userText.includes('서울')) {
-      response = '시청 근처 분석 결과입니다.\n\n세종대로 일대는 주정차 단속이 집중되는 구역이에요. 아래 주차장을 추천드립니다.';
+    if (userText.includes('?쒖껌') || userText.includes('?쒖슱')) {
+      response = '?쒖껌 洹쇱쿂 遺꾩꽍 寃곌낵?낅땲??\n\n?몄쥌?濡??쇰???二쇱젙李??⑥냽??吏묒쨷?섎뒗 援ъ뿭?댁뿉?? ?꾨옒 二쇱감?μ쓣 異붿쿇?쒕┰?덈떎.';
       recommendations = [
-        { name: '서울시청 공영주차장', distance: '도보 3분', available: 23, price: '10분 500원', safe: true },
-        { name: '프레스센터 주차장', distance: '도보 5분', available: 12, price: '10분 700원', safe: true },
-        { name: '세종문화회관 주차장', distance: '도보 7분', available: 45, price: '10분 600원', safe: true },
+        { name: '?쒖슱?쒖껌 怨듭쁺二쇱감??, distance: '?꾨낫 3遺?, available: 23, price: '10遺?500??, safe: true },
+        { name: '?꾨젅?ㅼ꽱??二쇱감??, distance: '?꾨낫 5遺?, available: 12, price: '10遺?700??, safe: true },
+        { name: '?몄쥌臾명솕?뚭? 二쇱감??, distance: '?꾨낫 7遺?, available: 45, price: '10遺?600??, safe: true },
       ];
-    } else if (userText.includes('무료')) {
-      response = '주변 무료 주차 가능 공간입니다.\n\n무료 주차는 시간 제한이 있으니 참고해 주세요.';
+    } else if (userText.includes('臾대즺')) {
+      response = '二쇰? 臾대즺 二쇱감 媛??怨듦컙?낅땲??\n\n臾대즺 二쇱감???쒓컙 ?쒗븳???덉쑝??李멸퀬??二쇱꽭??';
       recommendations = [
-        { name: '을지로 노상주차장', distance: '도보 4분', available: 8, price: '30분 무료', safe: true },
-        { name: '청계천 공영주차장', distance: '도보 8분', available: 15, price: '1시간 무료', safe: true },
+        { name: '?꾩?濡??몄긽二쇱감??, distance: '?꾨낫 4遺?, available: 8, price: '30遺?臾대즺', safe: true },
+        { name: '泥?퀎泥?怨듭쁺二쇱감??, distance: '?꾨낫 8遺?, available: 15, price: '1?쒓컙 臾대즺', safe: true },
       ];
-    } else if (userText.includes('단속') || userText.includes('안전')) {
-      response = '현재 위치 기준 단속 현황입니다.\n\n반경 500m 내 단속카메라 3개가 확인됩니다. 아래 안전한 주차장을 이용해 주세요.';
+    } else if (userText.includes('?⑥냽') || userText.includes('?덉쟾')) {
+      response = '?꾩옱 ?꾩튂 湲곗? ?⑥냽 ?꾪솴?낅땲??\n\n諛섍꼍 500m ???⑥냽移대찓??3媛쒓? ?뺤씤?⑸땲?? ?꾨옒 ?덉쟾??二쇱감?μ쓣 ?댁슜??二쇱꽭??';
       recommendations = [
-        { name: '명동 공영주차장', distance: '도보 6분', available: 32, price: '10분 600원', safe: true },
-        { name: '롯데백화점 주차장', distance: '도보 4분', available: 120, price: '10분 800원', safe: true },
+        { name: '紐낅룞 怨듭쁺二쇱감??, distance: '?꾨낫 6遺?, available: 32, price: '10遺?600??, safe: true },
+        { name: '濡?뜲諛깊솕??二쇱감??, distance: '?꾨낫 4遺?, available: 120, price: '10遺?800??, safe: true },
       ];
     } else {
-      response = '주변 주차장을 분석했습니다.\n\n현재 위치 기준 가장 가까운 안전한 주차장입니다.';
+      response = '二쇰? 二쇱감?μ쓣 遺꾩꽍?덉뒿?덈떎.\n\n?꾩옱 ?꾩튂 湲곗? 媛??媛源뚯슫 ?덉쟾??二쇱감?μ엯?덈떎.';
       recommendations = [
-        { name: '가까운 공영주차장', distance: '도보 5분', available: 18, price: '10분 500원', safe: true },
+        { name: '媛源뚯슫 怨듭쁺二쇱감??, distance: '?꾨낫 5遺?, available: 18, price: '10遺?500??, safe: true },
       ];
     }
 
@@ -270,7 +270,7 @@ export default function AIAssistantScreen({ navigation }) {
       type: 'ai',
       text: response,
       recommendations: recommendations,
-      time: '방금',
+      time: '諛⑷툑',
     };
   };
 
@@ -295,7 +295,7 @@ export default function AIAssistantScreen({ navigation }) {
             <Text style={styles.aiMessageText}>{item.text}</Text>
           </View>
           
-          {/* 주차장 추천 카드들 */}
+          {/* 二쇱감??異붿쿇 移대뱶??*/}
           {item.recommendations && (
             <View style={styles.recommendationsContainer}>
               {item.recommendations.map((rec, index) => (
@@ -316,7 +316,7 @@ export default function AIAssistantScreen({ navigation }) {
                     </View>
                     <View style={styles.recDetailItem}>
                       <Ionicons name="car-outline" size={14} color="#666" />
-                      <Text style={styles.recDetail}>{rec.available}자리</Text>
+                      <Text style={styles.recDetail}>{rec.available}?먮━</Text>
                     </View>
                     <View style={styles.recDetailItem}>
                       <Ionicons name="card-outline" size={14} color="#666" />
@@ -325,7 +325,7 @@ export default function AIAssistantScreen({ navigation }) {
                   </View>
                   <TouchableOpacity style={styles.navigateButton}>
                     <MaterialIcons name="directions" size={18} color="#fff" />
-                    <Text style={styles.navigateButtonText}>경로 안내</Text>
+                    <Text style={styles.navigateButtonText}>寃쎈줈 ?덈궡</Text>
                   </TouchableOpacity>
                 </TouchableOpacity>
               ))}
@@ -338,7 +338,7 @@ export default function AIAssistantScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 헤더 */}
+      {/* ?ㅻ뜑 */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
@@ -347,10 +347,10 @@ export default function AIAssistantScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
-          <Text style={styles.title}>AI 주차 도우미</Text>
+          <Text style={styles.title}>AI 二쇱감 ?꾩슦誘?/Text>
           <View style={styles.statusBadge}>
             <View style={styles.statusDot} />
-            <Text style={styles.statusText}>온라인</Text>
+            <Text style={styles.statusText}>?⑤씪??/Text>
           </View>
         </View>
         <TouchableOpacity style={styles.headerButton}>
@@ -358,7 +358,7 @@ export default function AIAssistantScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* 메시지 리스트 */}
+      {/* 硫붿떆吏 由ъ뒪??*/}
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -373,17 +373,17 @@ export default function AIAssistantScreen({ navigation }) {
                 <Ionicons name="sparkles" size={20} color="#fff" />
               </View>
               <View style={styles.typingBubble}>
-                <Text style={styles.typingText}>입력 중...</Text>
+                <Text style={styles.typingText}>?낅젰 以?..</Text>
               </View>
             </View>
           ) : null
         }
       />
 
-      {/* 빠른 질문 */}
+      {/* 鍮좊Ⅸ 吏덈Ц */}
       {messages.length <= 2 && (
         <View style={styles.quickQuestions}>
-          <Text style={styles.quickQuestionsTitle}>이렇게 물어보세요</Text>
+          <Text style={styles.quickQuestionsTitle}>?대젃寃?臾쇱뼱蹂댁꽭??/Text>
           <View style={styles.quickQuestionsGrid}>
             {QUICK_QUESTIONS.map((question, index) => (
               <TouchableOpacity 
@@ -398,12 +398,12 @@ export default function AIAssistantScreen({ navigation }) {
         </View>
       )}
 
-      {/* 입력창 */}
+      {/* ?낅젰李?*/}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.inputContainer}>
-          {/* 음성/TTS 토글 */}
+          {/* ?뚯꽦/TTS ?좉? */}
           <TouchableOpacity 
             style={[styles.voiceToggle, voiceEnabled && styles.voiceToggleActive]}
             onPress={() => {
@@ -421,14 +421,14 @@ export default function AIAssistantScreen({ navigation }) {
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
-              placeholder="메시지를 입력하세요..."
+              placeholder="硫붿떆吏瑜??낅젰?섏꽭??.."
               placeholderTextColor="#999"
               value={inputText}
               onChangeText={setInputText}
               multiline
             />
             
-            {/* 마이크 버튼 */}
+            {/* 留덉씠??踰꾪듉 */}
             <TouchableOpacity 
               style={styles.micButton}
               onPress={startVoiceInputReal}
@@ -454,7 +454,7 @@ export default function AIAssistantScreen({ navigation }) {
         </View>
       </KeyboardAvoidingView>
 
-      {/* 음성 입력 모달 */}
+      {/* ?뚯꽦 ?낅젰 紐⑤떖 */}
       <Modal
         visible={voiceModalVisible}
         animationType="fade"
@@ -464,13 +464,13 @@ export default function AIAssistantScreen({ navigation }) {
         <View style={styles.voiceModalOverlay}>
           <View style={styles.voiceModalContent}>
             <Text style={styles.voiceModalTitle}>
-              {isListening ? '듣고 있습니다...' : '인식 중...'}
+              {isListening ? '?ｊ퀬 ?덉뒿?덈떎...' : '?몄떇 以?..'}
             </Text>
             <Text style={styles.voiceModalSubtitle}>
-              목적지나 조건을 말씀해 주세요
+              紐⑹쟻吏??議곌굔??留먯???二쇱꽭??
             </Text>
             
-            {/* 음성 시각화 */}
+            {/* ?뚯꽦 ?쒓컖??*/}
             <View style={styles.voiceVisualizer}>
               <Animated.View 
                 style={[
@@ -483,14 +483,14 @@ export default function AIAssistantScreen({ navigation }) {
               </View>
             </View>
 
-            {/* 인식 중인 텍스트 */}
+            {/* ?몄떇 以묒씤 ?띿뒪??*/}
             {inputText ? (
               <View style={styles.recognizedTextContainer}>
                 <Text style={styles.recognizedText}>"{inputText}"</Text>
               </View>
             ) : null}
 
-            {/* 음성 웨이브 */}
+            {/* ?뚯꽦 ?⑥씠釉?*/}
             <View style={styles.voiceWaves}>
               {[0.3, 0.5, 0.7, 1, 0.7, 0.5, 0.3].map((height, i) => (
                 <Animated.View 
@@ -509,33 +509,33 @@ export default function AIAssistantScreen({ navigation }) {
               ))}
             </View>
 
-            {/* 취소 버튼 */}
+            {/* 痍⑥냼 踰꾪듉 */}
             <TouchableOpacity 
               style={styles.cancelVoiceButton}
               onPress={cancelVoiceInputReal}
             >
-              <Text style={styles.cancelVoiceText}>취소</Text>
+              <Text style={styles.cancelVoiceText}>痍⑥냼</Text>
             </TouchableOpacity>
 
-            {/* 예시 문구 */}
+            {/* ?덉떆 臾멸뎄 */}
             <View style={styles.voiceExamples}>
-              <Text style={styles.voiceExampleTitle}>이렇게 말해보세요</Text>
-              <Text style={styles.voiceExampleText}>"강남역 근처 30분 주차할 곳"</Text>
-              <Text style={styles.voiceExampleText}>"여기서 가까운 무료 주차장"</Text>
-              <Text style={styles.voiceExampleText}>"단속 없는 안전한 곳으로 안내해"</Text>
+              <Text style={styles.voiceExampleTitle}>?대젃寃?留먰빐蹂댁꽭??/Text>
+              <Text style={styles.voiceExampleText}>"媛뺣궓??洹쇱쿂 30遺?二쇱감??怨?</Text>
+              <Text style={styles.voiceExampleText}>"?ш린??媛源뚯슫 臾대즺 二쇱감??</Text>
+              <Text style={styles.voiceExampleText}>"?⑥냽 ?녿뒗 ?덉쟾??怨녹쑝濡??덈궡??</Text>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* TTS 재생 중 표시 */}
+      {/* TTS ?ъ깮 以??쒖떆 */}
       {isSpeaking && (
         <TouchableOpacity 
           style={styles.speakingIndicator}
           onPress={stopSpeaking}
         >
           <Ionicons name="volume-high" size={16} color="#fff" />
-          <Text style={styles.speakingText}>재생 중... 탭하여 중지</Text>
+          <Text style={styles.speakingText}>?ъ깮 以?.. ??븯??以묒?</Text>
         </TouchableOpacity>
       )}
     </SafeAreaView>
@@ -808,7 +808,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A2E',
   },
   
-  // 음성 모달 스타일
+  // ?뚯꽦 紐⑤떖 ?ㅽ???
   voiceModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',

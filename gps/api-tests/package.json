@@ -1,7 +1,7 @@
-{
+﻿{
   "name": "safeparking-api-tests",
   "version": "1.0.0",
-  "description": "SafeParking API 테스트",
+  "description": "SafeParking API ?뚯뒪??,
   "scripts": {
     "test:kakao": "node test-kakao-directions.js",
     "test:parking": "node test-parking-api.js",

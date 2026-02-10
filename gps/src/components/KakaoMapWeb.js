@@ -1,24 +1,24 @@
-import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
+﻿import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { KAKAO_JS_KEY } from '../config/keys';
 const SDK_URL = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JS_KEY}&autoload=false`;
 
 /**
- * 카카오맵 웹 컴포넌트 - 직접 스크립트 로딩 방식
+ * 移댁뭅?ㅻ㏊ ??而댄룷?뚰듃 - 吏곸젒 ?ㅽ겕由쏀듃 濡쒕뵫 諛⑹떇
  *
- * 1) <script> 태그를 document.head에 추가
- * 2) script.onload → kakao.maps.load(callback)
- * 3) callback 안에서 Map, Marker 등 사용
+ * 1) <script> ?쒓렇瑜?document.head??異붽?
+ * 2) script.onload ??kakao.maps.load(callback)
+ * 3) callback ?덉뿉??Map, Marker ???ъ슜
  */
 
-/* ── SDK 로딩 (싱글턴) ── */
+/* ?? SDK 濡쒕뵫 (?깃??? ?? */
 let sdkPromise = null;
 
 function loadKakaoSDK() {
   if (sdkPromise) return sdkPromise;
 
   sdkPromise = new Promise((resolve, reject) => {
-    // 이미 로드된 경우
+    // ?대? 濡쒕뱶??寃쎌슦
     if (window.kakao && window.kakao.maps && window.kakao.maps.load) {
       window.kakao.maps.load(() => resolve(window.kakao));
       return;
@@ -31,9 +31,9 @@ function loadKakaoSDK() {
     script.onload = () => {
       if (!window.kakao || !window.kakao.maps) {
         reject(new Error(
-          '카카오 SDK 스크립트가 로드되었지만 kakao.maps 객체가 없습니다.\n' +
-          '→ 카카오 개발자 콘솔에서 "지도/로컬" 서비스를 활성화했는지 확인하세요.\n' +
-          '→ 플랫폼 → Web → 사이트 도메인에 현재 주소를 등록했는지 확인하세요.'
+          '移댁뭅??SDK ?ㅽ겕由쏀듃媛 濡쒕뱶?섏뿀吏留?kakao.maps 媛앹껜媛 ?놁뒿?덈떎.\n' +
+          '??移댁뭅??媛쒕컻??肄섏넄?먯꽌 "吏??濡쒖뺄" ?쒕퉬?ㅻ? ?쒖꽦?뷀뻽?붿? ?뺤씤?섏꽭??\n' +
+          '???뚮옯????Web ???ъ씠???꾨찓?몄뿉 ?꾩옱 二쇱냼瑜??깅줉?덈뒗吏 ?뺤씤?섏꽭??'
         ));
         return;
       }
@@ -41,24 +41,24 @@ function loadKakaoSDK() {
     };
 
     script.onerror = () => {
-      sdkPromise = null; // 재시도 허용
+      sdkPromise = null; // ?ъ떆???덉슜
       reject(new Error(
-        '카카오맵 SDK 스크립트 다운로드 실패.\n' +
-        '→ 네트워크 연결을 확인하세요.\n' +
-        '→ 브라우저의 광고 차단 / 추적 방지 기능을 확인하세요.'
+        '移댁뭅?ㅻ㏊ SDK ?ㅽ겕由쏀듃 ?ㅼ슫濡쒕뱶 ?ㅽ뙣.\n' +
+        '???ㅽ듃?뚰겕 ?곌껐???뺤씤?섏꽭??\n' +
+        '??釉뚮씪?곗???愿묎퀬 李⑤떒 / 異붿쟻 諛⑹? 湲곕뒫???뺤씤?섏꽭??'
       ));
     };
 
     document.head.appendChild(script);
   });
 
-  // 실패 시 재시도 가능하도록
+  // ?ㅽ뙣 ???ъ떆??媛?ν븯?꾨줉
   sdkPromise.catch(() => { sdkPromise = null; });
 
   return sdkPromise;
 }
 
-/* ── 컴포넌트 ── */
+/* ?? 而댄룷?뚰듃 ?? */
 const KakaoMapWeb = forwardRef(function KakaoMapWeb(
   { center, parkings, routePath, is3D, onMarkerClick, onMapIdle },
   ref
@@ -78,7 +78,7 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
   cbIdle.current = onMapIdle;
   cbClick.current = onMarkerClick;
 
-  /* ── 경로 그리기/지우기 내부 함수 ── */
+  /* ?? 寃쎈줈 洹몃━湲?吏?곌린 ?대? ?⑥닔 ?? */
   function _clearRoute() {
     if (polylineRef.current) { polylineRef.current.setMap(null); polylineRef.current = null; }
     if (startMarkerRef.current) { startMarkerRef.current.setMap(null); startMarkerRef.current = null; }
@@ -90,10 +90,10 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
     _clearRoute();
     const kakao = window.kakao;
 
-    // Polyline 좌표
+    // Polyline 醫뚰몴
     const linePath = path.map(p => new kakao.maps.LatLng(p.lat, p.lng));
 
-    // 경로선
+    // 寃쎈줈??
     polylineRef.current = new kakao.maps.Polyline({
       path: linePath,
       strokeWeight: 6,
@@ -103,7 +103,7 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
     });
     polylineRef.current.setMap(mapRef.current);
 
-    // 출발 마커 (파란 원)
+    // 異쒕컻 留덉빱 (?뚮? ??
     startMarkerRef.current = new kakao.maps.CustomOverlay({
       position: linePath[0],
       content: '<div style="width:18px;height:18px;border-radius:50%;background:#3366FF;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>',
@@ -112,7 +112,7 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
     });
     startMarkerRef.current.setMap(mapRef.current);
 
-    // 도착 마커 (빨간 핀)
+    // ?꾩갑 留덉빱 (鍮④컙 ?)
     endMarkerRef.current = new kakao.maps.CustomOverlay({
       position: linePath[linePath.length - 1],
       content: '<div style="width:24px;height:24px;border-radius:50% 50% 50% 0;background:#E74C3C;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);transform:rotate(-45deg)"></div>',
@@ -121,13 +121,13 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
     });
     endMarkerRef.current.setMap(mapRef.current);
 
-    // 경로가 보이도록 지도 영역 조정
+    // 寃쎈줈媛 蹂댁씠?꾨줉 吏???곸뿭 議곗젙
     const bounds = new kakao.maps.LatLngBounds();
     linePath.forEach(p => bounds.extend(p));
     mapRef.current.setBounds(bounds, 80, 80, 80, 80);
   }
 
-  // panTo / drawRoute / clearRoute / relayout 외부 호출
+  // panTo / drawRoute / clearRoute / relayout ?몃? ?몄텧
   useImperativeHandle(ref, () => ({
     panTo: (lat, lng) => {
       if (mapRef.current && window.kakao) {
@@ -141,14 +141,14 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
     },
   }));
 
-  // 3D 모드 전환 시 지도 relayout
+  // 3D 紐⑤뱶 ?꾪솚 ??吏??relayout
   useEffect(() => {
     if (status === 'ready' && mapRef.current) {
       setTimeout(() => mapRef.current.relayout(), 100);
     }
   }, [is3D, status]);
 
-  // SDK 로딩 + 지도 초기화
+  // SDK 濡쒕뵫 + 吏??珥덇린??
   useEffect(() => {
     let cancelled = false;
 
@@ -171,12 +171,12 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
 
         setStatus('ready');
 
-        // 초기 idle 콜백
+        // 珥덇린 idle 肄쒕갚
         if (cbIdle.current) cbIdle.current(center.latitude, center.longitude);
       } catch (err) {
         if (!cancelled) {
-          console.error('카카오맵 초기화 실패:', err);
-          setErrorMsg(err.message || '알 수 없는 오류');
+          console.error('移댁뭅?ㅻ㏊ 珥덇린???ㅽ뙣:', err);
+          setErrorMsg(err.message || '?????녿뒗 ?ㅻ쪟');
           setStatus('error');
         }
       }
@@ -184,14 +184,14 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
 
     init();
     return () => { cancelled = true; };
-  }, []); // 한번만 실행
+  }, []); // ?쒕쾲留??ㅽ뻾
 
-  // 마커 업데이트
+  // 留덉빱 ?낅뜲?댄듃
   useEffect(() => {
     if (status !== 'ready' || !mapRef.current || !window.kakao) return;
     const kakao = window.kakao;
 
-    // 기존 마커 제거
+    // 湲곗〈 留덉빱 ?쒓굅
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
@@ -207,7 +207,7 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
     });
   }, [parkings, status]);
 
-  // routePath 변경 시 Polyline 업데이트
+  // routePath 蹂寃???Polyline ?낅뜲?댄듃
   useEffect(() => {
     if (status !== 'ready') return;
     if (routePath && routePath.length >= 2) {
@@ -217,7 +217,7 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
     }
   }, [routePath, status]);
 
-  // panTo on center change (지도 생성 이후)
+  // panTo on center change (吏???앹꽦 ?댄썑)
   useEffect(() => {
     if (status === 'ready' && mapRef.current && window.kakao) {
       mapRef.current.panTo(
@@ -229,16 +229,16 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
   if (status === 'error') {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorIcon}>⚠️</Text>
-        <Text style={styles.errorTitle}>카카오맵을 불러올 수 없습니다</Text>
+        <Text style={styles.errorIcon}>?좑툘</Text>
+        <Text style={styles.errorTitle}>移댁뭅?ㅻ㏊??遺덈윭?????놁뒿?덈떎</Text>
         <Text style={styles.errorBody}>{errorMsg}</Text>
         <View style={styles.helpBox}>
-          <Text style={styles.helpTitle}>✅ 확인 사항:</Text>
+          <Text style={styles.helpTitle}>???뺤씤 ?ы빆:</Text>
           <Text style={styles.helpText}>
-            1. developers.kakao.com → 내 애플리케이션 → 세이프파킹{'\n'}
-            2. 제품 설정 → <Text style={styles.bold}>지도/로컬 → 활성화(ON)</Text>{'\n'}
-            3. 플랫폼 → Web → 사이트 도메인에{'\n'}
-               <Text style={styles.bold}>http://localhost:8081</Text> 등록
+            1. developers.kakao.com ?????좏뵆由ъ??댁뀡 ???몄씠?꾪뙆??'\n'}
+            2. ?쒗뭹 ?ㅼ젙 ??<Text style={styles.bold}>吏??濡쒖뺄 ???쒖꽦??ON)</Text>{'\n'}
+            3. ?뚮옯????Web ???ъ씠???꾨찓?몄뿉{'\n'}
+               <Text style={styles.bold}>http://localhost:8081</Text> ?깅줉
           </Text>
         </View>
       </View>
@@ -250,10 +250,10 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
       {status === 'loading' && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>카카오맵 로딩 중...</Text>
+          <Text style={styles.loadingText}>移댁뭅?ㅻ㏊ 濡쒕뵫 以?..</Text>
         </View>
       )}
-      {/* 3D 퍼스펙티브 래퍼 */}
+      {/* 3D ?쇱뒪?숉떚釉??섑띁 */}
       <div
         ref={mapWrapperRef}
         style={{
@@ -274,7 +274,7 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
           }}
         />
       </div>
-      {/* 3D 모드 상단 그라데이션 (하늘 효과) */}
+      {/* 3D 紐⑤뱶 ?곷떒 洹몃씪?곗씠??(?섎뒛 ?④낵) */}
       {is3D && (
         <div
           style={{

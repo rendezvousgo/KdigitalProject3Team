@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,12 +12,13 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { createPost, updatePost } from '../services/communityApi';
 
 const CATEGORIES = [
-  { id: 1, name: 'ììœ ê²Œì‹œíŒ' },
-  { id: 2, name: 'ì£¼ì°¨ íŒ' },
-  { id: 3, name: 'ë‹¨ì† ì •ë³´' },
-  { id: 4, name: 'ì§ˆë¬¸ë‹µë³€' },
+  { id: 1, name: 'ÀÚÀ¯°Ô½ÃÆÇ' },
+  { id: 2, name: 'ÁÖÂ÷ ÆÁ' },
+  { id: 3, name: '¼Óµµ Á¤º¸' },
+  { id: 4, name: 'Áú¹®/´äº¯' },
 ];
 
 export default function PostWriteScreen({ route, navigation }) {
@@ -25,17 +26,20 @@ export default function PostWriteScreen({ route, navigation }) {
   const presetCategoryId = route.params?.categoryId || null;
 
   const [title, setTitle] = useState('');
+  const [writer, setWriter] = useState('');
   const [content, setContent] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const isEdit = !!editPost;
 
   useEffect(() => {
     if (editPost) {
-      setTitle(editPost.title);
-      setContent(editPost.content);
-      const found = CATEGORIES.find(c => c.name === editPost.categoryName);
+      setTitle(editPost.title || '');
+      setWriter(editPost.writer || '');
+      setContent(editPost.content || '');
+      const found = CATEGORIES.find(c => c.id === editPost?.category?.id);
       if (found) setSelectedCategoryId(found.id);
     } else if (presetCategoryId) {
       setSelectedCategoryId(presetCategoryId);
@@ -44,40 +48,58 @@ export default function PostWriteScreen({ route, navigation }) {
 
   const selectedCategory = CATEGORIES.find(c => c.id === selectedCategoryId);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedCategoryId) {
-      Alert.alert('ì•Œë¦¼', 'ì¹´í…Œê³ ë¦¬ë¥¼ ì„ íƒí•´ì£¼ì„¸ìš”.');
+      Alert.alert('¾Ë¸²', 'Ä«Å×°í¸®¸¦ ¼±ÅÃÇØÁÖ¼¼¿ä.');
       return;
     }
     if (!title.trim()) {
-      Alert.alert('ì•Œë¦¼', 'ì œëª©ì„ ì…ë ¥í•´ì£¼ì„¸ìš”.');
+      Alert.alert('¾Ë¸²', 'Á¦¸ñÀ» ÀÔ·ÂÇØÁÖ¼¼¿ä.');
       return;
     }
     if (!content.trim()) {
-      Alert.alert('ì•Œë¦¼', 'ë‚´ìš©ì„ ì…ë ¥í•´ì£¼ì„¸ìš”.');
+      Alert.alert('¾Ë¸²', '³»¿ëÀ» ÀÔ·ÂÇØÁÖ¼¼¿ä.');
       return;
     }
 
-    // TODO: ë°±ì—”ë“œ API ì—°ë™
-    if (isEdit) {
-      Alert.alert('ìˆ˜ì • ì™„ë£Œ', 'ê²Œì‹œê¸€ì´ ìˆ˜ì •ë˜ì—ˆìŠµë‹ˆë‹¤.', [
-        { text: 'í™•ì¸', onPress: () => navigation.goBack() },
-      ]);
-    } else {
-      Alert.alert('ì‘ì„± ì™„ë£Œ', 'ê²Œì‹œê¸€ì´ ë“±ë¡ë˜ì—ˆìŠµë‹ˆë‹¤.', [
-        { text: 'í™•ì¸', onPress: () => navigation.goBack() },
-      ]);
+    setSubmitting(true);
+    try {
+      if (isEdit) {
+        await updatePost(editPost.id, {
+          title: title.trim(),
+          content: content.trim(),
+          writer: writer.trim(),
+          categoryId: selectedCategoryId,
+        });
+        Alert.alert('¼öÁ¤ ¿Ï·á', '°Ô½Ã±ÛÀÌ ¼öÁ¤µÇ¾ú½À´Ï´Ù.', [
+          { text: 'È®ÀÎ', onPress: () => navigation.goBack() },
+        ]);
+      } else {
+        await createPost({
+          title: title.trim(),
+          content: content.trim(),
+          writer: writer.trim(),
+          categoryId: selectedCategoryId,
+        });
+        Alert.alert('ÀÛ¼º ¿Ï·á', '°Ô½Ã±ÛÀÌ µî·ÏµÇ¾ú½À´Ï´Ù.', [
+          { text: 'È®ÀÎ', onPress: () => navigation.goBack() },
+        ]);
+      }
+    } catch (e) {
+      Alert.alert('¿äÃ» ½ÇÆĞ', e.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleCancel = () => {
     if (title.trim() || content.trim()) {
       Alert.alert(
-        'ì‘ì„± ì·¨ì†Œ',
-        'ì‘ì„± ì¤‘ì¸ ë‚´ìš©ì´ ì‚­ì œë©ë‹ˆë‹¤. ì·¨ì†Œí•˜ì‹œê² ìŠµë‹ˆê¹Œ?',
+        'ÀÛ¼º Ãë¼Ò',
+        'ÀÛ¼º ÁßÀÎ ³»¿ëÀÌ »èÁ¦µË´Ï´Ù. Ãë¼ÒÇÏ½Ã°Ú½À´Ï±î?',
         [
-          { text: 'ê³„ì† ì‘ì„±', style: 'cancel' },
-          { text: 'ì·¨ì†Œ', style: 'destructive', onPress: () => navigation.goBack() },
+          { text: '°è¼Ó ÀÛ¼º', style: 'cancel' },
+          { text: 'Ãë¼Ò', style: 'destructive', onPress: () => navigation.goBack() },
         ]
       );
     } else {
@@ -87,55 +109,42 @@ export default function PostWriteScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* í—¤ë” */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel} style={styles.cancelBtn}>
-          <Text style={styles.cancelText}>ì·¨ì†Œ</Text>
+          <Text style={styles.cancelText}>Ãë¼Ò</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isEdit ? 'ê¸€ ìˆ˜ì •' : 'ìƒˆ ê¸€ ì‘ì„±'}</Text>
+        <Text style={styles.headerTitle}>{isEdit ? '±Û ¼öÁ¤' : '±Û ÀÛ¼º'}</Text>
         <TouchableOpacity
           style={[
             styles.submitBtn,
-            (!title.trim() || !content.trim() || !selectedCategoryId) && styles.submitBtnDisabled,
+            (submitting || !title.trim() || !content.trim() || !selectedCategoryId) && styles.submitBtnDisabled,
           ]}
           onPress={handleSubmit}
-          disabled={!title.trim() || !content.trim() || !selectedCategoryId}
+          disabled={submitting || !title.trim() || !content.trim() || !selectedCategoryId}
         >
           <Text
             style={[
               styles.submitText,
-              (!title.trim() || !content.trim() || !selectedCategoryId) && styles.submitTextDisabled,
+              (submitting || !title.trim() || !content.trim() || !selectedCategoryId) && styles.submitTextDisabled,
             ]}
           >
-            {isEdit ? 'ìˆ˜ì •' : 'ë“±ë¡'}
+            {isEdit ? '¼öÁ¤' : 'µî·Ï'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ì¹´í…Œê³ ë¦¬ ì„ íƒ */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.formSection}>
-            <Text style={styles.label}>ì¹´í…Œê³ ë¦¬</Text>
+            <Text style={styles.label}>Ä«Å×°í¸®</Text>
             <TouchableOpacity
               style={styles.categorySelector}
               onPress={() => setShowCategoryPicker(!showCategoryPicker)}
             >
               <Text style={[styles.categorySelectorText, !selectedCategory && styles.placeholder]}>
-                {selectedCategory ? selectedCategory.name : 'ì¹´í…Œê³ ë¦¬ë¥¼ ì„ íƒí•˜ì„¸ìš”'}
+                {selectedCategory ? selectedCategory.name : 'Ä«Å×°í¸®¸¦ ¼±ÅÃÇØÁÖ¼¼¿ä'}
               </Text>
-              <Ionicons
-                name={showCategoryPicker ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color="#999"
-              />
+              <Ionicons name={showCategoryPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#999" />
             </TouchableOpacity>
 
             {showCategoryPicker && (
@@ -143,21 +152,13 @@ export default function PostWriteScreen({ route, navigation }) {
                 {CATEGORIES.map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
-                    style={[
-                      styles.categoryOption,
-                      selectedCategoryId === cat.id && styles.categoryOptionActive,
-                    ]}
+                    style={[styles.categoryOption, selectedCategoryId === cat.id && styles.categoryOptionActive]}
                     onPress={() => {
                       setSelectedCategoryId(cat.id);
                       setShowCategoryPicker(false);
                     }}
                   >
-                    <Text
-                      style={[
-                        styles.categoryOptionText,
-                        selectedCategoryId === cat.id && styles.categoryOptionTextActive,
-                      ]}
-                    >
+                    <Text style={[styles.categoryOptionText, selectedCategoryId === cat.id && styles.categoryOptionTextActive]}>
                       {cat.name}
                     </Text>
                     {selectedCategoryId === cat.id && (
@@ -169,12 +170,23 @@ export default function PostWriteScreen({ route, navigation }) {
             )}
           </View>
 
-          {/* ì œëª© */}
           <View style={styles.formSection}>
-            <Text style={styles.label}>ì œëª©</Text>
+            <Text style={styles.label}>ÀÛ¼ºÀÚ</Text>
             <TextInput
               style={styles.titleInput}
-              placeholder="ì œëª©ì„ ì…ë ¥í•˜ì„¸ìš”"
+              placeholder="ÀÛ¼ºÀÚ¸íÀ» ÀÔ·ÂÇÏ¼¼¿ä (ºñ¿ì¸é ÀÍ¸í)"
+              placeholderTextColor="#bbb"
+              value={writer}
+              onChangeText={setWriter}
+              maxLength={30}
+            />
+          </View>
+
+          <View style={styles.formSection}>
+            <Text style={styles.label}>Á¦¸ñ</Text>
+            <TextInput
+              style={styles.titleInput}
+              placeholder="Á¦¸ñÀ» ÀÔ·ÂÇÏ¼¼¿ä"
               placeholderTextColor="#bbb"
               value={title}
               onChangeText={setTitle}
@@ -183,12 +195,11 @@ export default function PostWriteScreen({ route, navigation }) {
             <Text style={styles.charCount}>{title.length}/100</Text>
           </View>
 
-          {/* ë‚´ìš© */}
           <View style={styles.formSection}>
-            <Text style={styles.label}>ë‚´ìš©</Text>
+            <Text style={styles.label}>³»¿ë</Text>
             <TextInput
               style={styles.contentInput}
-              placeholder="ë‚´ìš©ì„ ì…ë ¥í•˜ì„¸ìš”"
+              placeholder="³»¿ëÀ» ÀÔ·ÂÇÏ¼¼¿ä"
               placeholderTextColor="#bbb"
               value={content}
               onChangeText={setContent}
@@ -209,8 +220,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
-
-  // â”€â”€ í—¤ë” â”€â”€
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -252,7 +261,6 @@ const styles = StyleSheet.create({
     color: '#bbb',
   },
 
-  // â”€â”€ í¼ â”€â”€
   scroll: {
     flex: 1,
   },
@@ -275,7 +283,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // â”€â”€ ì¹´í…Œê³ ë¦¬ â”€â”€
   categorySelector: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -322,7 +329,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // â”€â”€ ì œëª© â”€â”€
   titleInput: {
     backgroundColor: '#F8F8F8',
     padding: 14,
@@ -339,7 +345,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  // â”€â”€ ë‚´ìš© â”€â”€
   contentInput: {
     backgroundColor: '#F8F8F8',
     padding: 14,

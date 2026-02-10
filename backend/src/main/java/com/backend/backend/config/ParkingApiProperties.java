@@ -1,4 +1,4 @@
-﻿package com.backend.backend.config;
+package com.backend.backend.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -41,3 +41,4 @@ public class ParkingApiProperties {
         this.perPage = perPage;
     }
 }
+

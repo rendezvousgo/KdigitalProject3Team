@@ -1,16 +1,11 @@
 /**
- * SafeParking API ì„œë¹„ìŠ¤
+ * SafeParking API ¼­ºñ½º
  */
-
-//ìŒì„±ì‹œìŠ¤í…œ
 
 import { KAKAO_REST_API_KEY, PARKING_API_KEY } from '../config/keys';
 
 const KAKAO_API_KEY = KAKAO_REST_API_KEY;
 
-/**
- * ì¹´ì¹´ì˜¤ ëª¨ë¹Œë¦¬í‹° - ê¸¸ì°¾ê¸°
- */
 export async function getDirections(origin, destination, options = {}) {
   const params = new URLSearchParams({
     origin: `${origin.lng},${origin.lat}`,
@@ -27,36 +22,33 @@ export async function getDirections(origin, destination, options = {}) {
       `https://apis-navi.kakaomobility.com/v1/directions?${params}`,
       {
         headers: {
-          'Authorization': `KakaoAK ${KAKAO_API_KEY}`,
+          Authorization: `KakaoAK ${KAKAO_API_KEY}`,
           'Content-Type': 'application/json',
         },
       }
     );
 
-    if (!response.ok) throw new Error('ê¸¸ì°¾ê¸° ì‹¤íŒ¨');
-    
+    if (!response.ok) throw new Error('±æÃ£±â ½ÇÆĞ');
+
     const data = await response.json();
     const route = data.routes?.[0];
-    
+
     if (!route || route.result_code !== 0) {
-      throw new Error(route?.result_msg || 'ê²½ë¡œë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤');
+      throw new Error(route?.result_msg || '°æ·Î¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù');
     }
 
     return {
-      distance: route.summary.distance, // ë¯¸í„°
-      duration: route.summary.duration, // ì´ˆ
+      distance: route.summary.distance,
+      duration: route.summary.duration,
       fare: route.summary.fare,
       sections: route.sections,
     };
   } catch (error) {
-    console.error('ê¸¸ì°¾ê¸° API ì˜¤ë¥˜:', error);
+    console.error('±æÃ£±â API ¿À·ù:', error);
     throw error;
   }
 }
 
-/**
- * ê³µì˜ì£¼ì°¨ì¥ ëª©ë¡ ì¡°íšŒ
- */
 export async function getParkingLots(region = null, subRegion = null) {
   const params = new URLSearchParams({
     page: 1,
@@ -65,10 +57,10 @@ export async function getParkingLots(region = null, subRegion = null) {
   });
 
   if (region) {
-    params.append('cond[ì§€ì—­êµ¬ë¶„::EQ]', region);
+    params.append('cond[½Ã±º±¸¸í:EQ]', region);
   }
   if (subRegion) {
-    params.append('cond[ì§€ì—­êµ¬ë¶„_sub::EQ]', subRegion);
+    params.append('cond[½Ã±º±¸¸ísub:EQ]', subRegion);
   }
 
   try {
@@ -76,35 +68,31 @@ export async function getParkingLots(region = null, subRegion = null) {
       `https://api.odcloud.kr/api/15050093/v1/uddi:d19c8e21-4445-43fe-b2a6-865dff832e08?${params}`
     );
 
-    if (!response.ok) throw new Error('ì£¼ì°¨ì¥ ì¡°íšŒ ì‹¤íŒ¨');
-    
+    if (!response.ok) throw new Error('ÁÖÂ÷Àå Á¶È¸ ½ÇÆĞ');
+
     const data = await response.json();
-    
+
     return (data.data || []).map(lot => ({
-      id: lot['ì£¼ì°¨ì¥ê´€ë¦¬ë²ˆí˜¸'],
-      name: lot['ì£¼ì°¨ì¥ëª…'],
-      address: lot['ì£¼ì°¨ì¥ë„ë¡œëª…ì£¼ì†Œ'] || lot['ì£¼ì°¨ì¥ì§€ë²ˆì£¼ì†Œ'],
-      lat: parseFloat(lot['ìœ„ë„']),
-      lng: parseFloat(lot['ê²½ë„']),
-      capacity: parseInt(lot['ì£¼ì°¨êµ¬íšìˆ˜']) || 0,
-      fee: lot['ìš”ê¸ˆì •ë³´'],
-      weekdayHours: `${lot['í‰ì¼ìš´ì˜ì‹œì‘ì‹œê°'] || '?'} ~ ${lot['í‰ì¼ìš´ì˜ì¢…ë£Œì‹œê°'] || '?'}`,
-      phone: lot['ì—°ë½ì²˜'],
+      id: lot['ÁÖÂ÷Àå°ü¸®¹øÈ£'],
+      name: lot['ÁÖÂ÷Àå¸í'],
+      address: lot['ÁÖÂ÷Àåµµ·Î¸íÁÖ¼Ò'] || lot['ÁÖÂ÷ÀåÁö¹øÁÖ¼Ò'],
+      lat: parseFloat(lot['À§µµ']),
+      lng: parseFloat(lot['°æµµ']),
+      capacity: parseInt(lot['ÁÖÂ÷±¸È¹¼ö']) || 0,
+      fee: lot['¿ä±İÁ¤º¸'],
+      weekdayHours: `${lot['ÆòÀÏ¿î¿µ½ÃÀÛ½Ã°¢'] || '-'} ~ ${lot['ÆòÀÏ¿î¿µÁ¾·á½Ã°¢'] || '-'}`,
+      phone: lot['ÀüÈ­¹øÈ£'],
     })).filter(lot => !isNaN(lot.lat) && !isNaN(lot.lng));
   } catch (error) {
-    console.error('ì£¼ì°¨ì¥ API ì˜¤ë¥˜:', error);
+    console.error('ÁÖÂ÷Àå API ¿À·ù:', error);
     throw error;
   }
 }
 
-/**
- * íŠ¹ì • ì¢Œí‘œ ì£¼ë³€ ì£¼ì°¨ì¥ ì°¾ê¸°
- */
 export async function findNearbyParkingLots(lat, lng, radiusKm = 1) {
   try {
-    // ì„œìš¸ ë°ì´í„°ë§Œ ê°€ì ¸ì˜¤ê¸° (ì „ì²´ëŠ” ë„ˆë¬´ ë§ìŒ)
-    const allLots = await getParkingLots('ì„œìš¸íŠ¹ë³„ì‹œ');
-    
+    const allLots = await getParkingLots('¼­¿ïÆ¯º°½Ã');
+
     return allLots
       .map(lot => {
         const distance = calculateDistance(lat, lng, lot.lat, lot.lng);
@@ -112,16 +100,13 @@ export async function findNearbyParkingLots(lat, lng, radiusKm = 1) {
       })
       .filter(lot => lot.distance <= radiusKm)
       .sort((a, b) => a.distance - b.distance)
-      .slice(0, 20); // ìµœëŒ€ 20ê°œ
+      .slice(0, 20);
   } catch (error) {
-    console.error('ì£¼ë³€ ì£¼ì°¨ì¥ ê²€ìƒ‰ ì˜¤ë¥˜:', error);
+    console.error('ÁÖº¯ ÁÖÂ÷Àå °Ë»ö ¿À·ù:', error);
     return [];
   }
 }
 
-/**
- * ì¹´ì¹´ì˜¤ Local í‚¤ì›Œë“œ ê²€ìƒ‰ (ì¥ì†Œ ê²€ìƒ‰)
- */
 export async function searchPlaces(keyword, lat, lng) {
   const params = new URLSearchParams({
     query: keyword,
@@ -138,12 +123,12 @@ export async function searchPlaces(keyword, lat, lng) {
       `https://dapi.kakao.com/v2/local/search/keyword.json?${params}`,
       {
         headers: {
-          'Authorization': `KakaoAK ${KAKAO_API_KEY}`,
+          Authorization: `KakaoAK ${KAKAO_API_KEY}`,
         },
       }
     );
 
-    if (!response.ok) throw new Error('ì¥ì†Œ ê²€ìƒ‰ ì‹¤íŒ¨');
+    if (!response.ok) throw new Error('Àå¼Ò °Ë»ö ½ÇÆĞ');
     const data = await response.json();
 
     return (data.documents || []).map(doc => ({
@@ -154,23 +139,20 @@ export async function searchPlaces(keyword, lat, lng) {
       lng: parseFloat(doc.x),
       category: doc.category_group_name || '',
       phone: doc.phone || '',
-      distance: doc.distance ? parseInt(doc.distance) : null,
+      distance: doc.distance ? parseInt(doc.distance, 10) : null,
       type: 'place',
     }));
   } catch (error) {
-    console.error('ì¥ì†Œ ê²€ìƒ‰ ì˜¤ë¥˜:', error);
+    console.error('Àå¼Ò °Ë»ö ¿À·ù:', error);
     return [];
   }
 }
 
-/**
- * ê³µì˜ì£¼ì°¨ì¥ ì´ë¦„/ì£¼ì†Œ í‚¤ì›Œë“œ ê²€ìƒ‰
- */
 let parkingCache = null;
 export async function searchParkingByName(keyword) {
   try {
     if (!parkingCache) {
-      parkingCache = await getParkingLots('ì„œìš¸íŠ¹ë³„ì‹œ');
+      parkingCache = await getParkingLots('¼­¿ïÆ¯º°½Ã');
     }
     const kw = keyword.toLowerCase();
     return parkingCache
@@ -178,42 +160,33 @@ export async function searchParkingByName(keyword) {
       .slice(0, 15)
       .map(lot => ({ ...lot, type: 'parking' }));
   } catch (error) {
-    console.error('ì£¼ì°¨ì¥ ê²€ìƒ‰ ì˜¤ë¥˜:', error);
+    console.error('ÁÖÂ÷Àå °Ë»ö ¿À·ù:', error);
     return [];
   }
 }
 
-/**
- * ë‘ ì¢Œí‘œ ê°„ ê±°ë¦¬ ê³„ì‚° (km)
- */
 function calculateDistance(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat/2) ** 2 + 
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
-            Math.sin(dLng/2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function toRad(deg) {
   return deg * Math.PI / 180;
 }
 
-/**
- * ê±°ë¦¬ í¬ë§·íŒ…
- */
 export function formatDistance(meters) {
   if (meters < 1000) return `${Math.round(meters)}m`;
   return `${(meters / 1000).toFixed(1)}km`;
 }
 
-/**
- * ì‹œê°„ í¬ë§·íŒ…
- */
 export function formatDuration(seconds) {
   const mins = Math.round(seconds / 60);
   const hours = Math.floor(mins / 60);
   const remainMins = mins % 60;
-  return hours > 0 ? `${hours}ì‹œê°„ ${remainMins}ë¶„` : `${remainMins}ë¶„`;
+  return hours > 0 ? `${hours}½Ã°£ ${remainMins}ºĞ` : `${remainMins}ºĞ`;
 }
