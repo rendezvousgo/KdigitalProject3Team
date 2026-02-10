@@ -232,7 +232,7 @@ const KakaoMapNative = forwardRef(function KakaoMapNative(
       // ignore
     }
   };
-
+  // source - 앱 켜지는 순간 부모 컴포넌트에서 넘겨준 center값에따라 결정 -> 호출하는곳 찾기
   return (
     <View style={styles.container}>
       <WebView

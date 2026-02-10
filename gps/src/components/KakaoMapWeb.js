@@ -157,7 +157,7 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
         setStatus('loading');
         const kakao = await loadKakaoSDK();
         if (cancelled || !mapContainerRef.current) return;
-
+       /*위치 에러 원인 수정*/
         const map = new kakao.maps.Map(mapContainerRef.current, {
           center: new kakao.maps.LatLng(center.latitude, center.longitude),
           level: 4,
@@ -208,6 +208,7 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
   }, [parkings, status]);
 
   // routePath 변경 시 Polyline 업데이트
+  //center 변경 감지 로직
   useEffect(() => {
     if (status !== 'ready') return;
     if (routePath && routePath.length >= 2) {
