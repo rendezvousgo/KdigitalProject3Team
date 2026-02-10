@@ -1,5 +1,6 @@
 ﻿package com.backend.backend.service;
 
+import com.backend.backend.config.KakaoApiProperties;
 import com.backend.backend.config.ParkingApiProperties;
 import com.backend.backend.dto.ParkingCandidateDto;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -8,6 +9,10 @@ import java.net.URI;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -15,11 +20,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class PublicParkingApiServiceImpl implements PublicParkingApiService {
 
     private final ParkingApiProperties parkingApiProperties;
+    private final KakaoApiProperties kakaoApiProperties;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    public PublicParkingApiServiceImpl(ParkingApiProperties parkingApiProperties) {
+    public PublicParkingApiServiceImpl(ParkingApiProperties parkingApiProperties, KakaoApiProperties kakaoApiProperties) {
         this.parkingApiProperties = parkingApiProperties;
+        this.kakaoApiProperties = kakaoApiProperties;
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
     }
@@ -78,6 +85,52 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
             throw new IllegalStateException("Failed to fetch public parking data.", e);
         }
 
+    }
+
+    // Kakao coord2regioncode API를 호출해 region_1depth_name을 반환한다.
+    @Override
+    public String findRegion1DepthName(double x, double y) {
+        if (!StringUtils.hasText(kakaoApiProperties.getRestKey())) {
+            throw new IllegalStateException("kakao.api.rest-key is required.");
+        }
+
+        URI uri = UriComponentsBuilder
+                .fromHttpUrl(kakaoApiProperties.getBaseUrl())
+                .queryParam("x", x)
+                .queryParam("y", y)
+                .build(true)
+                .toUri();
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "KakaoAK " + kakaoApiProperties.getRestKey());
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    uri,
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    String.class
+            );
+
+            JsonNode root = objectMapper.readTree(response.getBody());
+            JsonNode documents = root.path("documents");
+            if (documents.isArray() && documents.size() > 0) {
+                JsonNode first = documents.get(0);
+                String region1 = first.path("region_1depth_name").asText(null);
+                if (StringUtils.hasText(region1)) {
+                    return region1.trim();
+                }
+            }
+            return null;
+        } catch (HttpClientErrorException e) {
+            System.out.println("=== KAKAO API ERROR RESPONSE ===");
+            System.out.println(e.getResponseBodyAsString());
+            e.printStackTrace();
+            throw new IllegalStateException("Failed to fetch Kakao region data.", e);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IllegalStateException("Failed to fetch Kakao region data.", e);
+        }
     }
 
     // 응답 JSON에서 실제 데이터 배열 필드명(data/records/items)을 찾아 반환한다.
