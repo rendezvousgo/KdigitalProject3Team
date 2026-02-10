@@ -24,6 +24,7 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
         this.objectMapper = new ObjectMapper();
     }
 
+    // 공공 주차장 API를 호출해 사용자 좌표 기준 가장 가까운 주차장을 찾아 반환한다.
     @Override
     public ParkingCandidateDto findNearestParking(double userLatitude, double userLongitude) {
         System.out.println("Parking API baseUrl = " + parkingApiProperties.getBaseUrl());
@@ -43,9 +44,6 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
 
         try {
             String body = restTemplate.getForObject(uri, String.class);
-
-            System.out.println("=== RAW API RESPONSE ===");
-            System.out.println(body);
 
             JsonNode root = objectMapper.readTree(body);
             JsonNode dataArray = resolveDataArray(root);
@@ -82,6 +80,7 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
 
     }
 
+    // 응답 JSON에서 실제 데이터 배열 필드명(data/records/items)을 찾아 반환한다.
     private JsonNode resolveDataArray(JsonNode root) {
         if (root == null) {
             return null;
@@ -98,6 +97,7 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
         return null;
     }
 
+    // 여러 키 후보 중 텍스트 값을 찾아 반환한다(없으면 null).
     private String getTextByKeys(JsonNode node, String... keys) {
         for (String key : keys) {
             if (node.has(key) && !node.get(key).isNull()) {
@@ -110,6 +110,7 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
         return null;
     }
 
+    // 여러 키 후보 중 숫자 값을 찾아 Double로 반환한다(파싱 실패 시 다음 키 시도).
     private Double getDoubleByKeys(JsonNode node, String... keys) {
         for (String key : keys) {
             if (node.has(key) && !node.get(key).isNull()) {
@@ -127,6 +128,7 @@ public class PublicParkingApiServiceImpl implements PublicParkingApiService {
         return null;
     }
 
+    // 두 좌표 간의 대략적인 거리(미터)를 Haversine 공식으로 계산한다.
     private double calculateDistanceMeters(double lat1, double lon1, double lat2, double lon2) {
         double earthRadius = 6371000.0;
         double dLat = Math.toRadians(lat2 - lat1);

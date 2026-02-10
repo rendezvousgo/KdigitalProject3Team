@@ -62,7 +62,15 @@ public class VoiceParkingGuideServiceImpl implements VoiceParkingGuideService {
         }
     }
 
+    //밑의 키워드가 포함되면 주차 안내 요청으로 인식함
     private boolean containsParkingIntent(String transcript) {
-        return transcript.contains("주차장") || transcript.contains("주차") || transcript.contains("parking");
+        return transcript.contains("주차장")
+                || transcript.contains("주차")
+                || transcript.contains("parking")
+                || transcript.contains("파킹")
+                || transcript.contains("주차할 곳")
+                || transcript.contains("차 댈 곳")
+                || transcript.contains("주차 자리")
+                || transcript.contains("주차공간");
     }
 }
