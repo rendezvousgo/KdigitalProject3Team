@@ -11,4 +11,22 @@
 -keep class com.swmansion.reanimated.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }
 
+# KNSDK (카카오모빌리티 내비 SDK)
+-keep class com.kakaomobility.** { *; }
+-keep class com.kakao.** { *; }
+
+# SafeParking custom native modules
+-keep class com.triceratops.safeparking.** { *; }
+
+# React Native
+-keep class com.facebook.react.** { *; }
+-keep class com.facebook.hermes.** { *; }
+-keep class com.facebook.jni.** { *; }
+
+# react-native-voice
+-keep class com.wenkesj.voice.** { *; }
+
+# react-native-webview
+-keep class com.reactnativecommunity.webview.** { *; }
+
 # Add any project specific keep options here:
