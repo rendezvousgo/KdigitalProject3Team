@@ -1,4 +1,4 @@
-// ADB reverse 포워딩 사용: adb reverse tcp:8080 tcp:8080
-// 이렇게 하면 에뮬레이터/핸드폰 모두 localhost:8080으로 PC 백엔드에 접근 가능
-// (핸드폰은 USB 연결 + adb reverse 필요)
-export const API_BASE_URL = 'http://localhost:8080';
+// 핸드폰에서 QR코드로 실행 시: PC의 Wi-Fi IP로 접근해야 함
+// PC와 핸드폰이 같은 Wi-Fi에 연결되어 있어야 합니다
+// USB 디버깅 시에는 'http://localhost:8080' 사용 (adb reverse tcp:8080 tcp:8080)
+export const API_BASE_URL = 'http://192.168.1.83:8080';

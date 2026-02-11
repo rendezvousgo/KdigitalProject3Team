@@ -82,48 +82,40 @@ export async function getDirections(origin, destination, options = {}) {
  * 공영주차장 목록 조회
  */
 export async function getParkingLots(region = null, subRegion = null) {
-  const allRows = [];
-  const maxPages = 10; // lkb 커밋 취지와 동일하게 페이지 확장
+  const params = new URLSearchParams({
+    page: 1,
+    perPage: 1000,
+    serviceKey: PARKING_API_KEY,
+    'cond[주차장구분::EQ]': '공영',
+  });
+
+  if (region) {
+    params.append('cond[지역구분::EQ]', region);
+  }
+  if (subRegion) {
+    params.append('cond[지역구분_sub::EQ]', subRegion);
+  }
 
   try {
-    for (let page = 1; page <= maxPages; page++) {
-      const params = new URLSearchParams({
-        page: String(page),
-        perPage: '1000',
-        serviceKey: PARKING_API_KEY,
-        'cond[주차장구분::EQ]': '공영',
-      });
+    const response = await fetch(
+      `https://api.odcloud.kr/api/15050093/v1/uddi:d19c8e21-4445-43fe-b2a6-865dff832e08?${params}`
+    );
 
-      if (region) params.append('cond[지역구분::EQ]', region);
-      if (subRegion) params.append('cond[지역구분_sub::EQ]', subRegion);
-
-      const response = await fetch(
-        `https://api.odcloud.kr/api/15050093/v1/uddi:d19c8e21-4445-43fe-b2a6-865dff832e08?${params}`
-      );
-
-      if (!response.ok) throw new Error(`주차장 조회 실패 (page ${page})`);
-
-      const data = await response.json();
-      const rows = data.data || [];
-      allRows.push(...rows);
-
-      // 더 이상 데이터 없으면 조기 종료
-      if (rows.length === 0) break;
-    }
-
-    return allRows
-      .map((lot) => ({
-        id: lot['주차장관리번호'],
-        name: lot['주차장명'],
-        address: lot['주차장도로명주소'] || lot['주차장지번주소'],
-        lat: parseFloat(lot['위도']),
-        lng: parseFloat(lot['경도']),
-        capacity: parseInt(lot['주차구획수']) || 0,
-        fee: lot['요금정보'],
-        weekdayHours: `${lot['평일운영시작시각'] || '?'} ~ ${lot['평일운영종료시각'] || '?'}`,
-        phone: lot['연락처'],
-      }))
-      .filter((lot) => !isNaN(lot.lat) && !isNaN(lot.lng));
+    if (!response.ok) throw new Error('주차장 조회 실패');
+    
+    const data = await response.json();
+    
+    return (data.data || []).map(lot => ({
+      id: lot['주차장관리번호'],
+      name: lot['주차장명'],
+      address: lot['주차장도로명주소'] || lot['주차장지번주소'],
+      lat: parseFloat(lot['위도']),
+      lng: parseFloat(lot['경도']),
+      capacity: parseInt(lot['주차구획수']) || 0,
+      fee: lot['요금정보'],
+      weekdayHours: `${lot['평일운영시작시각'] || '?'} ~ ${lot['평일운영종료시각'] || '?'}`,
+      phone: lot['연락처'],
+    })).filter(lot => !isNaN(lot.lat) && !isNaN(lot.lng));
   } catch (error) {
     console.error('주차장 API 오류:', error);
     throw error;

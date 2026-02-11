@@ -12,8 +12,8 @@
 import { findNearbyParkingLots, searchPlaces, getDirections, formatDistance, formatDuration } from './api';
 
 // ── GPT API 설정 ──────────────────────────────────────────
-const GPT_API_KEY =
-  'YOUR_OPENAI_API_KEY_HERE';
+// OpenAI API Key - 환경변수 또는 직접 설정
+const GPT_API_KEY = process.env.OPENAI_API_KEY || 'YOUR_OPENAI_API_KEY';
 
 const MODEL_CLASSIFY = 'gpt-4.1-nano';
 const MODEL_ANSWER   = 'gpt-4.1-mini';

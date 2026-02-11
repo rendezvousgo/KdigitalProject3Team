@@ -42,24 +42,10 @@ export default function HomeScreen({ navigation, route }) {
   const bottomSheetAnim = useRef(new Animated.Value(0)).current;
   const [mapCenter, setMapCenter] = useState(DEFAULT_LOCATION);
   const [myLocationActive, setMyLocationActive] = useState(false);
-  const locatingRef = useRef(false);
 
   const [knsdkStatus, setKnsdkStatus] = useState('초기화 대기');
   const [knsdkReady, setKnsdkReady] = useState(false);
   const [keyHashInfo, setKeyHashInfo] = useState(null);
-
-  const moveToAndZoomLevel4 = (latitude, longitude) => {
-    setMapCenter({ latitude, longitude });
-    if (!kakaoMapRef.current) return;
-    if (kakaoMapRef.current.setCenter) {
-      kakaoMapRef.current.setCenter(latitude, longitude);
-    } else {
-      kakaoMapRef.current.panTo(latitude, longitude);
-    }
-    if (kakaoMapRef.current.setLevel) {
-      kakaoMapRef.current.setLevel(4);
-    }
-  };
 
   // 위치 권한 → GPS 취득 → KNSDK 초기화 (순서 보장)
   useEffect(() => {
@@ -91,7 +77,7 @@ export default function HomeScreen({ navigation, route }) {
             // 지도가 화면에 그려진 직후(약 0.8초 뒤) 카메라를 내 위치로 이동
             setTimeout(() => {
               if (kakaoMapRef.current) {
-                moveToAndZoomLevel4(newCoords.latitude, newCoords.longitude);
+                kakaoMapRef.current.panTo(newCoords.latitude, newCoords.longitude);
                 if (kakaoMapRef.current.showMyLocation) {
                   kakaoMapRef.current.showMyLocation(newCoords.latitude, newCoords.longitude);
                 }
@@ -268,43 +254,18 @@ export default function HomeScreen({ navigation, route }) {
   };
 
 const goToMyLocation = async () => {
-  if (locatingRef.current) {
-    if (location) {
-      moveToAndZoomLevel4(location.latitude, location.longitude);
+  // 토글: 이미 활성화된 상태면 끄기
+  if (myLocationActive) {
+    setMyLocationActive(false);
+    if (kakaoMapRef.current?.hideMyLocation) {
+      kakaoMapRef.current.hideMyLocation();
     }
     return;
   }
-  locatingRef.current = true;
 
   try {
     const Location = require('expo-location');
-
-    // 이미 확보한 위치가 있으면 즉시 중앙 이동
-    if (location) {
-      moveToAndZoomLevel4(location.latitude, location.longitude);
-      if (kakaoMapRef.current?.showMyLocation) {
-        kakaoMapRef.current.showMyLocation(location.latitude, location.longitude);
-      }
-      setMyLocationActive(true);
-    }
-
-    // 캐시된 마지막 위치도 바로 반영 (권한 체크보다 먼저)
-    const lastLoc = await Location.getLastKnownPositionAsync();
-    if (lastLoc) {
-      const { latitude, longitude } = lastLoc.coords;
-      moveToAndZoomLevel4(latitude, longitude);
-      if (kakaoMapRef.current?.showMyLocation) {
-        kakaoMapRef.current.showMyLocation(latitude, longitude);
-      }
-      setLocation(lastLoc.coords);
-      setMyLocationActive(true);
-    }
-
-    let { status } = await Location.getForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      const req = await Location.requestForegroundPermissionsAsync();
-      status = req.status;
-    }
+    let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('위치 권한', '현재 위치를 확인하려면 위치 권한을 허용해주세요.');
       return;
@@ -312,10 +273,19 @@ const goToMyLocation = async () => {
 
     // --- [여기서부터 속도 최적화 핵심!] ---
     
-    // 실제 현재 위치로 보정
+    // 1. 일단 가장 최근에 알려진 위치를 '즉시' 가져옵니다 (0.1초 컷)
+    const lastLoc = await Location.getLastKnownPositionAsync();
+    if (lastLoc && kakaoMapRef.current) {
+      const { latitude, longitude } = lastLoc.coords;
+      kakaoMapRef.current.panTo(latitude, longitude);
+      // 일단 마지막 위치로 먼저 지도를 옮겨서 사용자를 안심시킵니다.
+    }
+
+    // 2. 그 다음 실제 현재 위치를 가져오는데, Accuracy를 Balanced로 조절!
+    // High보다 훨씬 빠르고 정확도 차이도 거의 없습니다.
     let loc = await Location.getCurrentPositionAsync({ 
-      accuracy: Location.Accuracy.Balanced,
-      timeout: 3000,
+      accuracy: Location.Accuracy.Balanced, // 속도 우선!
+      timeout: 5000, // 5초 넘으면 중단
     });
 
     const coords = loc.coords;
@@ -324,16 +294,16 @@ const goToMyLocation = async () => {
     setMyLocationActive(true);
 
     if (kakaoMapRef.current) {
-      moveToAndZoomLevel4(coords.latitude, coords.longitude);
+      kakaoMapRef.current.panTo(coords.latitude, coords.longitude);
       if (kakaoMapRef.current.showMyLocation) {
         kakaoMapRef.current.showMyLocation(coords.latitude, coords.longitude);
       }
     }
+    // --- [최적화 끝] ---
 
   } catch (e) {
     console.error('현재위치 이동 실패:', e);
-  } finally {
-    locatingRef.current = false;
+    // 오류가 나도 마지막 위치가 있다면 조용히 넘어가는 게 더 매끄러울 수 있습니다.
   }
 };
 // ★☆★☆ 여기서부터 끝까지 덮어쓰시면 됩니다 ★☆★☆
@@ -400,10 +370,10 @@ const goToMyLocation = async () => {
                 </TouchableOpacity>
               )}
               <TouchableOpacity
-                style={styles.mapButton}
+                style={[styles.mapButton, myLocationActive && styles.mapButtonMyLocActive]}
                 onPress={goToMyLocation}
               >
-                <MaterialIcons name="my-location" size={24} color="#007AFF" />
+                <MaterialIcons name="my-location" size={24} color={myLocationActive ? '#fff' : '#007AFF'} />
               </TouchableOpacity>
               {/* <TouchableOpacity 
                 style={styles.mapButton}
