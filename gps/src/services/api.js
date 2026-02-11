@@ -1,9 +1,36 @@
 /**
  * SafeParking API 서비스
  */
+
+//음성시스템
+
 import { KAKAO_REST_API_KEY, PARKING_API_KEY } from '../config/keys';
 
 const KAKAO_API_KEY = KAKAO_REST_API_KEY;
+
+/**
+ * Kakao coord2regioncode: 좌표 -> region_1depth_name
+ */
+export async function getRegion1DepthName(x, y) {
+  const params = new URLSearchParams({ x: String(x), y: String(y) });
+  try {
+    const response = await fetch(
+      `https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?${params}`,
+      {
+        headers: {
+          'Authorization': `KakaoAK ${KAKAO_API_KEY}`,
+        },
+      }
+    );
+    if (!response.ok) throw new Error('좌표->행정구역 변환 실패');
+    const data = await response.json();
+    const doc = data.documents?.[0];
+    return doc?.region_1depth_name || null;
+  } catch (error) {
+    console.error('coord2regioncode API 오류:', error);
+    return null;
+  }
+}
 
 /**
  * 카카오 모빌리티 - 길찾기
@@ -101,7 +128,9 @@ export async function getParkingLots(region = null, subRegion = null) {
 export async function findNearbyParkingLots(lat, lng, radiusKm = 30) {
   try {
     // 서울 데이터만 가져오기 (전체는 너무 많음)
-    const allLots = await getParkingLots('서울특별시');
+    const region1 = await getRegion1DepthName(lng, lat);
+    cachedRegion1 = region1 || cachedRegion1;
+    const allLots = await getParkingLots(region1 || '서울특별시');
     
     return allLots
       .map(lot => {
@@ -165,10 +194,11 @@ export async function searchPlaces(keyword, lat, lng) {
  * 공영주차장 이름/주소 키워드 검색
  */
 let parkingCache = null;
+let cachedRegion1 = null;
 export async function searchParkingByName(keyword) {
   try {
     if (!parkingCache) {
-      parkingCache = await getParkingLots('서울특별시');
+      parkingCache = await getParkingLots(cachedRegion1 || '서울특별시');
     }
     const kw = keyword.toLowerCase();
     return parkingCache
