@@ -1,4 +1,4 @@
-// 웹에서는 react-native-maps를 사용하지 않음
+﻿// ?뱀뿉?쒕뒗 react-native-maps瑜??ъ슜?섏? ?딆쓬
 export const MapView = null;
 export const Marker = null;
 export const Circle = null;

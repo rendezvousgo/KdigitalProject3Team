@@ -1,8 +1,8 @@
-/**
- * 공공데이터포털 - 전국공영주차장 API 테스트
+﻿/**
+ * 怨듦났?곗씠?고룷??- ?꾧뎅怨듭쁺二쇱감??API ?뚯뒪??
  * 
- * 엔드포인트: GET https://api.odcloud.kr/api/15050093/v1/uddi:d19c8e21-4445-43fe-b2a6-865dff832e08
- * 데이터: 한국교통안전공단_전국공영주차장정보
+ * ?붾뱶?ъ씤?? GET https://api.odcloud.kr/api/15050093/v1/uddi:d19c8e21-4445-43fe-b2a6-865dff832e08
+ * ?곗씠?? ?쒓뎅援먰넻?덉쟾怨듬떒_?꾧뎅怨듭쁺二쇱감?μ젙蹂?
  */
 
 require('dotenv').config();
@@ -12,7 +12,7 @@ const API_KEY = process.env.DATA_GO_KR_API_KEY;
 const BASE_URL = 'https://api.odcloud.kr/api/15050093/v1/uddi:d19c8e21-4445-43fe-b2a6-865dff832e08';
 
 /**
- * 전국 공영주차장 목록 조회
+ * ?꾧뎅 怨듭쁺二쇱감??紐⑸줉 議고쉶
  */
 async function getParkingLots(options = {}) {
   const params = new URLSearchParams({
@@ -21,19 +21,19 @@ async function getParkingLots(options = {}) {
     serviceKey: API_KEY,
   });
 
-  // 조건 검색 (지역명 등)
-  // 참고: 공공데이터 API는 cond 파라미터로 필터링 가능
-  // 예: cond[지역구분::EQ]=서울특별시
+  // 議곌굔 寃??(吏??챸 ??
+  // 李멸퀬: 怨듦났?곗씠??API??cond ?뚮씪誘명꽣濡??꾪꽣留?媛??
+  // ?? cond[吏??뎄遺?:EQ]=?쒖슱?밸퀎??
   if (options.region) {
-    params.append('cond[지역구분::EQ]', options.region);
+    params.append('cond[吏??뎄遺?:EQ]', options.region);
   }
   if (options.subRegion) {
-    params.append('cond[지역구분_sub::EQ]', options.subRegion);
+    params.append('cond[吏??뎄遺?sub::EQ]', options.subRegion);
   }
 
   const url = `${BASE_URL}?${params.toString()}`;
   
-  console.log('\n📍 요청 URL:', url.replace(API_KEY, 'API_KEY_HIDDEN'));
+  console.log('\n?뱧 ?붿껌 URL:', url.replace(API_KEY, 'API_KEY_HIDDEN'));
 
   try {
     const response = await fetch(url, {
@@ -51,35 +51,35 @@ async function getParkingLots(options = {}) {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('❌ 요청 실패:', error.message);
+    console.error('???붿껌 ?ㅽ뙣:', error.message);
     throw error;
   }
 }
 
 /**
- * 특정 좌표 주변 주차장 찾기 (클라이언트 사이드 필터링)
+ * ?뱀젙 醫뚰몴 二쇰? 二쇱감??李얘린 (?대씪?댁뼵???ъ씠???꾪꽣留?
  * 
- * 공공데이터 API는 위치 기반 검색을 지원하지 않으므로,
- * 전체 데이터를 가져온 후 거리 계산으로 필터링
+ * 怨듦났?곗씠??API???꾩튂 湲곕컲 寃?됱쓣 吏?먰븯吏 ?딆쑝誘濡?
+ * ?꾩껜 ?곗씠?곕? 媛?몄삩 ??嫄곕━ 怨꾩궛?쇰줈 ?꾪꽣留?
  */
 function filterByDistance(parkingLots, targetLat, targetLng, radiusKm = 1) {
   return parkingLots.filter(lot => {
-    const lat = parseFloat(lot['위도']);
-    const lng = parseFloat(lot['경도']);
+    const lat = parseFloat(lot['?꾨룄']);
+    const lng = parseFloat(lot['寃쎈룄']);
     
     if (isNaN(lat) || isNaN(lng)) return false;
     
     const distance = calculateDistance(targetLat, targetLng, lat, lng);
-    lot._distance = distance; // 거리 정보 추가
+    lot._distance = distance; // 嫄곕━ ?뺣낫 異붽?
     return distance <= radiusKm;
   }).sort((a, b) => a._distance - b._distance);
 }
 
 /**
- * 두 좌표 간 거리 계산 (Haversine formula)
+ * ??醫뚰몴 媛?嫄곕━ 怨꾩궛 (Haversine formula)
  */
 function calculateDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371; // 지구 반지름 (km)
+  const R = 6371; // 吏援?諛섏?由?(km)
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
   const a = 
@@ -95,130 +95,130 @@ function toRad(deg) {
 }
 
 /**
- * 주차장 정보 포맷팅 출력
+ * 二쇱감???뺣낫 ?щ㎎??異쒕젰
  */
 function displayParkingLot(lot, index) {
-  console.log(`\n  ${index + 1}. 📍 ${lot['주차장명']}`);
-  console.log(`     📌 주소: ${lot['주차장도로명주소'] || lot['주차장지번주소'] || '정보없음'}`);
-  console.log(`     🚗 주차구획: ${lot['주차구획수'] || '정보없음'}대`);
-  console.log(`     💰 요금: ${lot['요금정보'] || '정보없음'}`);
-  console.log(`     🕐 평일: ${lot['평일운영시작시각'] || '?'} ~ ${lot['평일운영종료시각'] || '?'}`);
-  console.log(`     🕐 토요일: ${lot['토요일운영시작시각'] || '?'} ~ ${lot['토요일운영종료시각'] || '?'}`);
-  console.log(`     🕐 공휴일: ${lot['공휴일운영시작시각'] || '?'} ~ ${lot['공휴일운영종료시각'] || '?'}`);
-  console.log(`     📞 연락처: ${lot['연락처'] || '정보없음'}`);
-  console.log(`     🗺️  좌표: ${lot['위도']}, ${lot['경도']}`);
+  console.log(`\n  ${index + 1}. ?뱧 ${lot['二쇱감?λ챸']}`);
+  console.log(`     ?뱦 二쇱냼: ${lot['二쇱감?λ룄濡쒕챸二쇱냼'] || lot['二쇱감?μ?踰덉＜??] || '?뺣낫?놁쓬'}`);
+  console.log(`     ?슅 二쇱감援ы쉷: ${lot['二쇱감援ы쉷??] || '?뺣낫?놁쓬'}?`);
+  console.log(`     ?뮥 ?붽툑: ${lot['?붽툑?뺣낫'] || '?뺣낫?놁쓬'}`);
+  console.log(`     ?븧 ?됱씪: ${lot['?됱씪?댁쁺?쒖옉?쒓컖'] || '?'} ~ ${lot['?됱씪?댁쁺醫낅즺?쒓컖'] || '?'}`);
+  console.log(`     ?븧 ?좎슂?? ${lot['?좎슂?쇱슫?곸떆?묒떆媛?] || '?'} ~ ${lot['?좎슂?쇱슫?곸쥌猷뚯떆媛?] || '?'}`);
+  console.log(`     ?븧 怨듯쑕?? ${lot['怨듯쑕?쇱슫?곸떆?묒떆媛?] || '?'} ~ ${lot['怨듯쑕?쇱슫?곸쥌猷뚯떆媛?] || '?'}`);
+  console.log(`     ?뱸 ?곕씫泥? ${lot['?곕씫泥?] || '?뺣낫?놁쓬'}`);
+  console.log(`     ?뿺截? 醫뚰몴: ${lot['?꾨룄']}, ${lot['寃쎈룄']}`);
   if (lot._distance) {
-    console.log(`     📏 거리: ${(lot._distance * 1000).toFixed(0)}m`);
+    console.log(`     ?뱩 嫄곕━: ${(lot._distance * 1000).toFixed(0)}m`);
   }
 }
 
 /**
- * 응답 데이터 요약 출력
+ * ?묐떟 ?곗씠???붿빟 異쒕젰
  */
 function displaySummary(data) {
   console.log('\n' + '='.repeat(60));
-  console.log('📊 조회 결과 요약');
+  console.log('?뱤 議고쉶 寃곌낵 ?붿빟');
   console.log('='.repeat(60));
-  console.log(`   📄 현재 페이지: ${data.page}`);
-  console.log(`   📊 페이지당 개수: ${data.perPage}`);
-  console.log(`   📈 전체 데이터 수: ${data.totalCount?.toLocaleString() || 'N/A'}`);
-  console.log(`   🔢 현재 페이지 데이터: ${data.currentCount}개`);
-  console.log(`   🎯 검색 조건 일치: ${data.matchCount?.toLocaleString() || data.totalCount?.toLocaleString() || 'N/A'}개`);
+  console.log(`   ?뱞 ?꾩옱 ?섏씠吏: ${data.page}`);
+  console.log(`   ?뱤 ?섏씠吏??媛쒖닔: ${data.perPage}`);
+  console.log(`   ?뱢 ?꾩껜 ?곗씠???? ${data.totalCount?.toLocaleString() || 'N/A'}`);
+  console.log(`   ?뵢 ?꾩옱 ?섏씠吏 ?곗씠?? ${data.currentCount}媛?);
+  console.log(`   ?렞 寃??議곌굔 ?쇱튂: ${data.matchCount?.toLocaleString() || data.totalCount?.toLocaleString() || 'N/A'}媛?);
 }
 
 /**
- * 메인 테스트 함수
+ * 硫붿씤 ?뚯뒪???⑥닔
  */
 async function runTests() {
-  console.log('🅿️  전국공영주차장 API 테스트');
+  console.log('?끏截? ?꾧뎅怨듭쁺二쇱감??API ?뚯뒪??);
   console.log('='.repeat(60));
 
   if (!API_KEY || API_KEY === 'your_data_go_kr_api_key_here') {
-    console.error('❌ DATA_GO_KR_API_KEY가 설정되지 않았습니다.');
-    console.log('   .env 파일에 API 키를 입력해주세요.');
-    console.log('\n📝 API 키 발급 방법:');
-    console.log('   1. https://www.data.go.kr 접속');
-    console.log('   2. "전국공영주차장정보" 검색');
-    console.log('   3. 활용신청 후 마이페이지에서 API 키 확인');
+    console.error('??DATA_GO_KR_API_KEY媛 ?ㅼ젙?섏? ?딆븯?듬땲??');
+    console.log('   .env ?뚯씪??API ?ㅻ? ?낅젰?댁＜?몄슂.');
+    console.log('\n?뱷 API ??諛쒓툒 諛⑸쾿:');
+    console.log('   1. https://www.data.go.kr ?묒냽');
+    console.log('   2. "?꾧뎅怨듭쁺二쇱감?μ젙蹂? 寃??);
+    console.log('   3. ?쒖슜?좎껌 ??留덉씠?섏씠吏?먯꽌 API ???뺤씤');
     return;
   }
 
-  console.log('✅ API 키 확인됨');
+  console.log('??API ???뺤씤??);
 
   try {
-    // 테스트 1: 기본 조회 (첫 페이지 10개)
-    console.log('\n\n🧪 테스트 1: 기본 조회 (첫 페이지)');
+    // ?뚯뒪??1: 湲곕낯 議고쉶 (泥??섏씠吏 10媛?
+    console.log('\n\n?㎦ ?뚯뒪??1: 湲곕낯 議고쉶 (泥??섏씠吏)');
     const result1 = await getParkingLots({ page: 1, perPage: 10 });
     displaySummary(result1);
     
     if (result1.data && result1.data.length > 0) {
-      console.log('\n📋 주차장 목록:');
+      console.log('\n?뱥 二쇱감??紐⑸줉:');
       result1.data.slice(0, 5).forEach((lot, idx) => displayParkingLot(lot, idx));
       if (result1.data.length > 5) {
-        console.log(`\n   ... 외 ${result1.data.length - 5}개`);
+        console.log(`\n   ... ??${result1.data.length - 5}媛?);
       }
     }
 
-    // 테스트 2: 서울 지역 필터링
-    console.log('\n\n🧪 테스트 2: 서울특별시 주차장 조회');
+    // ?뚯뒪??2: ?쒖슱 吏???꾪꽣留?
+    console.log('\n\n?㎦ ?뚯뒪??2: ?쒖슱?밸퀎??二쇱감??議고쉶');
     const result2 = await getParkingLots({ 
       page: 1, 
       perPage: 10,
-      region: '서울특별시'
+      region: '?쒖슱?밸퀎??
     });
     displaySummary(result2);
     
     if (result2.data && result2.data.length > 0) {
-      console.log('\n📋 서울 주차장 목록:');
+      console.log('\n?뱥 ?쒖슱 二쇱감??紐⑸줉:');
       result2.data.slice(0, 5).forEach((lot, idx) => displayParkingLot(lot, idx));
     }
 
-    // 테스트 3: 강남구 주차장
-    console.log('\n\n🧪 테스트 3: 서울 강남구 주차장 조회');
+    // ?뚯뒪??3: 媛뺣궓援?二쇱감??
+    console.log('\n\n?㎦ ?뚯뒪??3: ?쒖슱 媛뺣궓援?二쇱감??議고쉶');
     const result3 = await getParkingLots({ 
       page: 1, 
       perPage: 20,
-      region: '서울특별시',
-      subRegion: '강남구'
+      region: '?쒖슱?밸퀎??,
+      subRegion: '媛뺣궓援?
     });
     displaySummary(result3);
     
     if (result3.data && result3.data.length > 0) {
-      console.log('\n📋 강남구 주차장 목록:');
+      console.log('\n?뱥 媛뺣궓援?二쇱감??紐⑸줉:');
       result3.data.slice(0, 5).forEach((lot, idx) => displayParkingLot(lot, idx));
 
-      // 테스트 4: 특정 좌표 주변 주차장 (강남역 기준 1km)
-      console.log('\n\n🧪 테스트 4: 강남역 주변 1km 내 주차장');
+      // ?뚯뒪??4: ?뱀젙 醫뚰몴 二쇰? 二쇱감??(媛뺣궓??湲곗? 1km)
+      console.log('\n\n?㎦ ?뚯뒪??4: 媛뺣궓??二쇰? 1km ??二쇱감??);
       const gangnamStation = { lat: 37.497942, lng: 127.027619 };
       const nearbyLots = filterByDistance(
         result3.data, 
         gangnamStation.lat, 
         gangnamStation.lng, 
-        1 // 1km 반경
+        1 // 1km 諛섍꼍
       );
       
-      console.log(`\n📍 강남역 (${gangnamStation.lat}, ${gangnamStation.lng}) 기준`);
-      console.log(`🔍 반경 1km 내 주차장: ${nearbyLots.length}개`);
+      console.log(`\n?뱧 媛뺣궓??(${gangnamStation.lat}, ${gangnamStation.lng}) 湲곗?`);
+      console.log(`?뵇 諛섍꼍 1km ??二쇱감?? ${nearbyLots.length}媛?);
       
       if (nearbyLots.length > 0) {
-        console.log('\n📋 가까운 순 주차장:');
+        console.log('\n?뱥 媛源뚯슫 ??二쇱감??');
         nearbyLots.slice(0, 5).forEach((lot, idx) => displayParkingLot(lot, idx));
       }
     }
 
-    console.log('\n\n✅ 모든 테스트 완료!');
+    console.log('\n\n??紐⑤뱺 ?뚯뒪???꾨즺!');
 
   } catch (error) {
-    console.error('\n❌ 테스트 실패:', error.message);
+    console.error('\n???뚯뒪???ㅽ뙣:', error.message);
     
     if (error.message.includes('401') || error.message.includes('403')) {
-      console.log('\n💡 인증 오류 해결 방법:');
-      console.log('   1. API 키가 올바른지 확인');
-      console.log('   2. 공공데이터포털에서 활용신청 완료 여부 확인');
-      console.log('   3. 인코딩된 키를 사용해야 할 수 있음');
+      console.log('\n?뮕 ?몄쬆 ?ㅻ쪟 ?닿껐 諛⑸쾿:');
+      console.log('   1. API ?ㅺ? ?щ컮瑜몄? ?뺤씤');
+      console.log('   2. 怨듦났?곗씠?고룷?몄뿉???쒖슜?좎껌 ?꾨즺 ?щ? ?뺤씤');
+      console.log('   3. ?몄퐫?⑸맂 ?ㅻ? ?ъ슜?댁빞 ?????덉쓬');
     }
   }
 }
 
-// 실행
+// ?ㅽ뻾
 runTests();

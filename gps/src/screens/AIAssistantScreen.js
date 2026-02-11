@@ -12,30 +12,33 @@ import {
   Animated,
   Modal,
   Vibration,
-  StatusBar,   // ★ 추가
+  StatusBar,
+  Alert,
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 import Voice from '@react-native-voice/voice';
 import * as Location from 'expo-location';
 import { formatDistance } from '../services/api';
-import { BACKEND_BASE_URL } from '../config/backend';
+import { processUserMessage, resetConversation } from '../services/gptParkingService';
+import { emit } from '../services/eventBus';
+import { startNavigation as startKNSDKNavi } from '../services/knsdkBridge';
 
 // 기본 AI 안내
 const INITIAL_MESSAGES = [
   {
     id: 1,
     type: 'ai',
-    text: '안녕하세요! AI 주차 도우미입니다.\n\n목적지 주변 단속 상황과 안전한 주차 공간을 안내해드릴게요. 어디로 가시나요?',
+    text: '안녕하세요. SafeParking AI입니다.\n목적지 또는 주차장 검색 조건을 말씀해주세요.',
     time: '방금',
   },
 ];
 
 const QUICK_QUESTIONS = [
-  '시청 근처 주차장 추천',
-  '가까운 무료 주차장',
-  '단속 없는 안전 구역',
-  '30분 단기 주차',
+  '근처 주차장 찾아줘',
+  '무료 공영 주차장',
+  '가까운 순으로 5개',
+  '시청 근처 주차장',
 ];
 
 export default function AIAssistantScreen({ navigation }) {
@@ -52,6 +55,7 @@ export default function AIAssistantScreen({ navigation }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const waveAnim = useRef(new Animated.Value(0)).current;
   const recognizedTextRef = useRef('');
+  const sendMessageRef = useRef(null);
 
   useEffect(() => {
     if (isTyping) {
@@ -87,14 +91,27 @@ export default function AIAssistantScreen({ navigation }) {
 
   // STT 이벤트 처리
   useEffect(() => {
+    Voice.onSpeechStart = () => {
+      console.log('STT: onSpeechStart');
+    };
+
     Voice.onSpeechResults = (event) => {
       const text = event?.value?.[0] ?? '';
+      console.log('STT: onSpeechResults -', text);
       recognizedTextRef.current = text;
       setInputText(text);
+
+      // 최종 결과가 왔으면 모달 닫고 메시지 전송
+      setIsListening(false);
+      setVoiceModalVisible(false);
+      if (text && text.trim()) {
+        sendMessageRef.current?.(text);
+      }
     };
 
     Voice.onSpeechPartialResults = (event) => {
       const text = event?.value?.[0] ?? '';
+      console.log('STT: partial -', text);
       if (text) {
         recognizedTextRef.current = text;
         setInputText(text);
@@ -102,21 +119,25 @@ export default function AIAssistantScreen({ navigation }) {
     };
 
     Voice.onSpeechEnd = () => {
+      // Android에서는 onSpeechEnd가 onSpeechResults보다 먼저 올 수 있음
+      // 모달 닫기는 onSpeechResults에서 처리하므로 여기서는 listening만 끔
+      console.log('STT: onSpeechEnd');
+      setIsListening(false);
+    };
+
+    Voice.onSpeechError = (e) => {
+      console.log('STT: onSpeechError', JSON.stringify(e));
       setIsListening(false);
       setVoiceModalVisible(false);
-      const finalText = recognizedTextRef.current;
-      if (finalText && finalText.trim()) {
-        sendMessage(finalText);
+      // 에러 코드 7 = NO_MATCH (말을 못 알아들음) → Alert 안 띄움
+      const code = e?.error?.code ?? e?.error ?? '';
+      if (String(code) !== '7') {
+        Alert.alert('음성 인식 오류', `음성 인식 중 오류가 발생했습니다. (코드: ${code})`);
       }
     };
 
-    Voice.onSpeechError = () => {
-      setIsListening(false);
-      setVoiceModalVisible(false);
-    };
-
     return () => {
-      Voice.destroy().then(Voice.removeAllListeners);
+      Voice.removeAllListeners();
     };
   }, []);
 
@@ -146,6 +167,18 @@ export default function AIAssistantScreen({ navigation }) {
   };
 
   const startVoiceInputReal = async () => {
+    try {
+      // Voice 모듈 사용 가능 여부 먼저 확인
+      const available = await Voice.isAvailable();
+      if (!available) {
+        Alert.alert('음성 인식 불가', '이 기기에서 음성 인식을 사용할 수 없습니다.\n설정 > Google > 음성 인식에서 확인해주세요.');
+        return;
+      }
+    } catch (checkErr) {
+      console.log('STT: isAvailable 체크 실패:', checkErr);
+      // 체크 실패해도 일단 시도
+    }
+
     setVoiceModalVisible(true);
     setIsListening(true);
     Vibration.vibrate(50);
@@ -155,9 +188,21 @@ export default function AIAssistantScreen({ navigation }) {
 
     try {
       await Voice.start('ko-KR');
+      console.log('STT: Voice.start() 성공');
     } catch (error) {
+      console.log('STT: Voice.start() 에러:', error);
       setIsListening(false);
       setVoiceModalVisible(false);
+
+      const msg = error?.message || String(error);
+      if (msg.includes('startSpeech') || msg.includes('null')) {
+        // 네이티브 모듈 초기화 문제 → 앱 재시작 안내
+        Alert.alert('음성 인식 오류', '음성 인식 모듈을 초기화할 수 없습니다.\n앱을 완전히 종료 후 다시 시작해주세요.');
+      } else if (msg.includes('permission') || msg.includes('Permission')) {
+        Alert.alert('권한 필요', '마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
+      } else {
+        Alert.alert('음성 인식 오류', `음성 인식 시작 실패: ${msg}`);
+      }
     }
   };
 
@@ -174,43 +219,7 @@ export default function AIAssistantScreen({ navigation }) {
     }
   };
 
-  // 음성 입력 모달 열기
-  const startVoiceInput = () => {
-    setVoiceModalVisible(true);
-    setIsListening(true);
-    Vibration.vibrate(50);
-    
-    // 실제로는 기기에서 STT 시작
-    // 데모: 3초 후 자동으로 인식된 텍스트를 시뮬레이션
-    setTimeout(() => {
-      simulateVoiceRecognition();
-    }, 3000);
-  };
-
-  // 음성 인식 시뮬레이션(실제로는 STT API 연동)
-  const simulateVoiceRecognition = () => {
-    const demoTexts = [
-      '강남역 근처 30분 주차장 찾아줘',
-      '여기서 가까운 무료 주차장 알려줘',
-      '단속 없는 안전한 곳으로 안내해줘',
-    ];
-    const randomText = demoTexts[Math.floor(Math.random() * demoTexts.length)];
-    
-    setIsListening(false);
-    setInputText(randomText);
-    
-    setTimeout(() => {
-      setVoiceModalVisible(false);
-      sendMessage(randomText);
-    }, 500);
-  };
-
-  // 음성 입력 취소
-  const cancelVoiceInput = () => {
-    setIsListening(false);
-    setVoiceModalVisible(false);
-    setInputText('');
-  };
+  // (시뮬레이션 코드 제거됨 — 실제 STT만 사용)
    const ensureLocation = async () => {
     if (userLocation) return userLocation;
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -223,51 +232,12 @@ export default function AIAssistantScreen({ navigation }) {
     return coords;
   };
 
-  const requestVoiceGuide = async (text, coords) => {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/voice-guide/parking`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        transcript: text,
-        userLatitude: coords.latitude,
-        userLongitude: coords.longitude,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`서버 응답 오류 (${response.status})`);
-    }
-
-    return response.json();
-  };
-
-  const buildAiMessage = (apiResponse) => {
-    const messageText = apiResponse?.navigationMessage || '응답을 처리하지 못했습니다.';
-    const targetParking = apiResponse?.targetParking || null;
-
-    const recommendations = targetParking
-      ? [
-          {
-            name: targetParking.parkingName || '주차장',
-            distance: typeof targetParking.distanceMeters === 'number'
-              ? formatDistance(targetParking.distanceMeters)
-              : '거리 정보 없음',
-            available: null,
-            price: null,
-            safe: true,
-            lat: targetParking.latitude,
-            lng: targetParking.longitude,
-          },
-        ]
-      : null;
-
-    return {
-      id: Date.now(),
-      type: 'ai',
-      text: messageText,
-      recommendations,
-      time: '방금',
-    };
+  // 최근 대화 맥락 생성 (GPT에 전달용, 최근 4개 메시지)
+  const buildConversationContext = () => {
+    return messages
+      .slice(-4)
+      .map(m => `${m.type === 'user' ? '사용자' : 'AI'}: ${m.text.slice(0, 120)}`)
+      .join('\n');
   };
 
   const sendMessage = async (text) => {
@@ -286,25 +256,90 @@ export default function AIAssistantScreen({ navigation }) {
 
     try {
       const coords = await ensureLocation();
-      const apiResponse = await requestVoiceGuide(text, coords);
-      const aiResponse = buildAiMessage(apiResponse);
+      const ctx = buildConversationContext();
+
+      // GPT 파이프라인: 분류(Nano) → 검증 → 데이터 조회 → 답변(Mini)
+      const result = await processUserMessage(
+        text,
+        coords.latitude,
+        coords.longitude,
+        ctx,
+      );
+
+      // 주차장 추천 카드 빌드
+      const recommendations = result.parkingList?.length > 0
+        ? result.parkingList.filter(p => p.type !== 'place').map(p => ({
+            name: p.name || '주차장',
+            distance: p.distance != null
+              ? (p.distance < 1 ? `${Math.round(p.distance * 1000)}m` : `${p.distance.toFixed(1)}km`)
+              : '거리 정보 없음',
+            available: p.capacity || null,
+            price: p.fee || null,
+            safe: true,
+            lat: p.lat,
+            lng: p.lng,
+          }))
+        : null;
+
+      // 경로 정보가 있으면 메시지에 포함
+      const routeInfo = result.routeInfo || null;
+
+      const aiResponse = {
+        id: Date.now(),
+        type: 'ai',
+        text: result.text,
+        recommendations: recommendations?.length > 0 ? recommendations : null,
+        routeInfo,
+        time: '방금',
+      };
+
       setIsTyping(false);
       setMessages(prev => [...prev, aiResponse]);
+
+      // route_set → 3D 네비게이션 바로 시작 (KNSDK)
+      if (result.action === 'navigateToMap' && result.routeInfo) {
+        const ri = result.routeInfo;
+        // TTS 안내
+        if (voiceEnabled) {
+          speakResponse(aiResponse.text);
+        }
+        // 내비 3D 시작
+        setTimeout(async () => {
+          try {
+            await startKNSDKNavi(
+              ri.destLat, ri.destLng, ri.destName || '목적지',
+              coords.latitude, coords.longitude,
+            );
+            console.log('AI → KNSDK 3D 네비 시작');
+          } catch (navErr) {
+            console.log('KNSDK 시작 실패, 지도로 폴백:', navErr);
+            emit('navigateToDestination', { name: ri.destName, lat: ri.destLat, lng: ri.destLng });
+            navigation.navigate('HomeTab');
+          }
+        }, 500);
+        return;
+      }
 
       if (voiceEnabled) {
         speakResponse(aiResponse.text);
       }
     } catch (error) {
+      console.log('GPT pipeline error:', error);
       setIsTyping(false);
       const errorMessage = {
         id: Date.now() + 1,
         type: 'ai',
-        text: error.message || '서버 연결에 실패했습니다.',
+        text: error.message?.includes('GPT API')
+          ? '서비스 연결에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.'
+          : (error.message || '요청을 처리하지 못했습니다.'),
         time: '방금',
       };
       setMessages(prev => [...prev, errorMessage]);
     }
   };
+
+  // sendMessageRef를 항상 최신 sendMessage로 동기화
+  sendMessageRef.current = sendMessage;
 
   const renderMessage = ({ item }) => {
     if (item.type === 'user') {
@@ -320,13 +355,33 @@ export default function AIAssistantScreen({ navigation }) {
     return (
       <View style={styles.aiMessageContainer}>
         <View style={styles.aiAvatar}>
-          <Ionicons name="sparkles" size={20} color="#fff" />
+          <Ionicons name="navigate" size={20} color="#fff" />
         </View>
         <View style={styles.aiMessageContent}>
           <View style={styles.aiMessage}>
             <Text style={styles.aiMessageText}>{item.text}</Text>
           </View>
           
+          {/* 경로 안내 카드 */}
+          {item.routeInfo && item.routeInfo.distance != null && (
+            <View style={styles.routeInfoCard}>
+              <View style={styles.routeInfoHeader}>
+                <MaterialIcons name="directions-car" size={18} color="#007AFF" />
+                <Text style={styles.routeInfoTitle}>{item.routeInfo.destName} 경로</Text>
+              </View>
+              <View style={styles.routeInfoDetails}>
+                <View style={styles.routeInfoItem}>
+                  <Ionicons name="speedometer-outline" size={14} color="#666" />
+                  <Text style={styles.routeInfoText}>{(item.routeInfo.distance / 1000).toFixed(1)}km</Text>
+                </View>
+                <View style={styles.routeInfoItem}>
+                  <Ionicons name="time-outline" size={14} color="#666" />
+                  <Text style={styles.routeInfoText}>약 {Math.round(item.routeInfo.duration / 60)}분</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* 주차장 추천 카드*/}
           {item.recommendations && (
             <View style={styles.recommendationsContainer}>
@@ -335,11 +390,6 @@ export default function AIAssistantScreen({ navigation }) {
                   <View style={styles.recHeader}>
                     <FontAwesome5 name="parking" size={16} color="#34C759" />
                     <Text style={styles.recName}>{rec.name}</Text>
-                    {rec.safe && (
-                      <View style={styles.safeBadge}>
-                        <Ionicons name="shield-checkmark" size={12} color="#34C759" />
-                      </View>
-                    )}
                   </View>
                   <View style={styles.recDetails}>
                     <View style={styles.recDetailItem}>
@@ -359,7 +409,22 @@ export default function AIAssistantScreen({ navigation }) {
                       </View>
                     )}
                   </View>
-                  <TouchableOpacity style={styles.navigateButton}>
+                  <TouchableOpacity 
+                    style={styles.navigateButton}
+                    onPress={async () => {
+                      try {
+                        const loc = await ensureLocation();
+                        await startKNSDKNavi(
+                          rec.lat, rec.lng, rec.name,
+                          loc.latitude, loc.longitude,
+                        );
+                      } catch (err) {
+                        console.log('카드 내비 시작 실패:', err);
+                        emit('navigateToDestination', { name: rec.name, lat: rec.lat, lng: rec.lng });
+                        navigation.navigate('HomeTab');
+                      }
+                    }}
+                  >
                     <MaterialIcons name="directions" size={18} color="#fff" />
                     <Text style={styles.navigateButtonText}>경로 안내</Text>
                   </TouchableOpacity>
@@ -383,7 +448,7 @@ export default function AIAssistantScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
-          <Text style={styles.title}>AI 주차 도우미</Text>
+          <Text style={styles.title}>SafeParking AI</Text>
           <View style={styles.statusBadge}>
             <View style={styles.statusDot} />
             <Text style={styles.statusText}>온라인</Text>
@@ -741,6 +806,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 6,
     fontSize: 14,
+  },
+  routeInfoCard: {
+    backgroundColor: '#EBF5FF',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#007AFF',
+  },
+  routeInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  routeInfoTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#007AFF',
+    marginLeft: 6,
+  },
+  routeInfoDetails: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  routeInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  routeInfoText: {
+    fontSize: 13,
+    color: '#333',
+    marginLeft: 4,
+    fontWeight: '600',
   },
   typingContainer: {
     flexDirection: 'row',

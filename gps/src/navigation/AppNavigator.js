@@ -1,16 +1,18 @@
-import React from 'react';
+﻿import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'; // 아이콘 추가
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { View, Platform, Text } from 'react-native';
+import { AuthProvider } from '../contexts/AuthContext';
 
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import AIAssistantScreen from '../screens/AIAssistantScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-// 게시판 스크린이 아직 없다면 임시로 View를 연결합니다.
-const CommunityScreen = () => <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><Text>게시판 준비 중</Text></View>;
+import CommunityScreen from '../screens/CommunityScreen';
+import PostDetailScreen from '../screens/PostDetailScreen';
+import PostWriteScreen from '../screens/PostWriteScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -68,6 +70,7 @@ function HomeTabs({ route, navigation }) {
                 {/* 노란 바닥에 파란 AI 로봇 아이콘 */}
               </View>
             );
+
           }
         },
        tabBarStyle: {
@@ -125,19 +128,35 @@ function HomeTabs({ route, navigation }) {
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Home" component={HomeTabs} />
-        <Stack.Screen 
-          name="Search" 
-          component={SearchScreen}
-          options={{ presentation: 'modal' }}
-        />
-        <Stack.Screen 
-          name="AIAssistant" 
-          component={AIAssistantScreen}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AuthProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Home" component={HomeTabs} />
+          <Stack.Screen 
+            name="Search" 
+            component={SearchScreen}
+            options={{ presentation: 'modal' }}
+          />
+          <Stack.Screen 
+            name="AIAssistant" 
+            component={AIAssistantScreen}
+          />
+          <Stack.Screen 
+            name="PostDetail" 
+            component={PostDetailScreen}
+            options={{
+              presentation: 'card',
+            }}
+          />
+          <Stack.Screen 
+            name="PostWrite" 
+            component={PostWriteScreen}
+            options={{
+              presentation: 'modal',
+            }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </AuthProvider>
   );
 }

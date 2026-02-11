@@ -1,8 +1,8 @@
-/**
- * 공공데이터포털 - 전국주정차금지(지정)구역 API 테스트
+﻿/**
+ * 怨듦났?곗씠?고룷??- ?꾧뎅二쇱젙李④툑吏(吏??援ъ뿭 API ?뚯뒪??
  * 
- * 엔드포인트: GET https://api.data.go.kr/openapi/tn_pubr_public_prkstop_prhibt_area_api
- * 데이터: 전국주정차금지(지정)구역표준데이터
+ * ?붾뱶?ъ씤?? GET https://api.data.go.kr/openapi/tn_pubr_public_prkstop_prhibt_area_api
+ * ?곗씠?? ?꾧뎅二쇱젙李④툑吏(吏??援ъ뿭?쒖??곗씠??
  */
 
 require('dotenv').config();
@@ -10,40 +10,40 @@ const fetch = require('node-fetch');
 const https = require('https');
 
 const API_KEY = process.env.NO_PARKING_ZONE_API_KEY;
-// HTTP 사용 (HTTPS는 www 리다이렉트 DNS 문제 있음)
+// HTTP ?ъ슜 (HTTPS??www 由щ떎?대젆??DNS 臾몄젣 ?덉쓬)
 const BASE_URL = 'http://api.data.go.kr/openapi/tn_pubr_public_prkstop_prhibt_area_api';
 
-// SSL 에러 무시 (개발용)
+// SSL ?먮윭 臾댁떆 (媛쒕컻??
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 /**
- * 주정차금지구역 목록 조회
+ * 二쇱젙李④툑吏援ъ뿭 紐⑸줉 議고쉶
  */
 async function getNoParakingZones(options = {}) {
   const params = new URLSearchParams({
     serviceKey: API_KEY,
     pageNo: options.pageNo || 1,
     numOfRows: options.numOfRows || 10,
-    type: options.type || 'json', // json 또는 xml
+    type: options.type || 'json', // json ?먮뒗 xml
   });
 
-  // 조건 검색
+  // 議곌굔 寃??
   if (options.ctprvnNm) {
-    params.append('ctprvnNm', options.ctprvnNm); // 시도명
+    params.append('ctprvnNm', options.ctprvnNm); // ?쒕룄紐?
   }
   if (options.signguNm) {
-    params.append('signguNm', options.signguNm); // 시군구명
+    params.append('signguNm', options.signguNm); // ?쒓뎔援щ챸
   }
   if (options.rdnmadr) {
-    params.append('rdnmadr', options.rdnmadr); // 도로명주소
+    params.append('rdnmadr', options.rdnmadr); // ?꾨줈紐낆＜??
   }
   if (options.lnmadr) {
-    params.append('lnmadr', options.lnmadr); // 지번주소
+    params.append('lnmadr', options.lnmadr); // 吏踰덉＜??
   }
 
   const url = `${BASE_URL}?${params.toString()}`;
   
-  console.log('\n📍 요청 URL:', url.replace(API_KEY, 'API_KEY_HIDDEN'));
+  console.log('\n?뱧 ?붿껌 URL:', url.replace(API_KEY, 'API_KEY_HIDDEN'));
 
   try {
     const response = await fetch(url, {
@@ -61,13 +61,13 @@ async function getNoParakingZones(options = {}) {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('❌ 요청 실패:', error.message);
+    console.error('???붿껌 ?ㅽ뙣:', error.message);
     throw error;
   }
 }
 
 /**
- * 특정 좌표 주변 금지구역 찾기
+ * ?뱀젙 醫뚰몴 二쇰? 湲덉?援ъ뿭 李얘린
  */
 function filterByDistance(zones, targetLat, targetLng, radiusKm = 0.5) {
   return zones.filter(zone => {
@@ -84,7 +84,7 @@ function filterByDistance(zones, targetLat, targetLng, radiusKm = 0.5) {
 }
 
 /**
- * 두 좌표 간 거리 계산 (Haversine)
+ * ??醫뚰몴 媛?嫄곕━ 怨꾩궛 (Haversine)
  */
 function calculateDistance(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -101,134 +101,134 @@ function toRad(deg) {
 }
 
 /**
- * 금지구역 정보 출력
+ * 湲덉?援ъ뿭 ?뺣낫 異쒕젰
  */
 function displayZone(zone, index) {
-  console.log(`\n  ${index + 1}. 🚫 ${zone.prhibtAreaNm || '(이름없음)'}`);
-  console.log(`     📌 도로명: ${zone.rdnmadr || '정보없음'}`);
-  console.log(`     📌 지번: ${zone.lnmadr || '정보없음'}`);
-  console.log(`     🏛️  시도: ${zone.ctprvnNm || ''} ${zone.signguNm || ''}`);
-  console.log(`     📋 금지유형: ${zone.prhibtSeNm || '정보없음'}`);
-  console.log(`     ⏰ 금지시간: ${zone.operBeginHhmm || '?'} ~ ${zone.operEndHhmm || '?'}`);
-  console.log(`     📅 금지요일: ${zone.prhibtDayNm || '정보없음'}`);
-  console.log(`     📝 사유: ${zone.prhibtRsnCn || '정보없음'}`);
-  console.log(`     🗺️  좌표: ${zone.latitude || '?'}, ${zone.longitude || '?'}`);
+  console.log(`\n  ${index + 1}. ?슟 ${zone.prhibtAreaNm || '(?대쫫?놁쓬)'}`);
+  console.log(`     ?뱦 ?꾨줈紐? ${zone.rdnmadr || '?뺣낫?놁쓬'}`);
+  console.log(`     ?뱦 吏踰? ${zone.lnmadr || '?뺣낫?놁쓬'}`);
+  console.log(`     ?룢截? ?쒕룄: ${zone.ctprvnNm || ''} ${zone.signguNm || ''}`);
+  console.log(`     ?뱥 湲덉??좏삎: ${zone.prhibtSeNm || '?뺣낫?놁쓬'}`);
+  console.log(`     ??湲덉??쒓컙: ${zone.operBeginHhmm || '?'} ~ ${zone.operEndHhmm || '?'}`);
+  console.log(`     ?뱟 湲덉??붿씪: ${zone.prhibtDayNm || '?뺣낫?놁쓬'}`);
+  console.log(`     ?뱷 ?ъ쑀: ${zone.prhibtRsnCn || '?뺣낫?놁쓬'}`);
+  console.log(`     ?뿺截? 醫뚰몴: ${zone.latitude || '?'}, ${zone.longitude || '?'}`);
   if (zone._distanceM) {
-    console.log(`     📏 거리: ${zone._distanceM}m`);
+    console.log(`     ?뱩 嫄곕━: ${zone._distanceM}m`);
   }
-  console.log(`     ℹ️  관리기관: ${zone.institutionNm || '정보없음'}`);
-  console.log(`     📞 연락처: ${zone.phoneNumber || '정보없음'}`);
+  console.log(`     ?뱄툘  愿由ш린愿: ${zone.institutionNm || '?뺣낫?놁쓬'}`);
+  console.log(`     ?뱸 ?곕씫泥? ${zone.phoneNumber || '?뺣낫?놁쓬'}`);
 }
 
 /**
- * 응답 요약
+ * ?묐떟 ?붿빟
  */
 function displaySummary(response) {
   console.log('\n' + '='.repeat(60));
-  console.log('📊 조회 결과 요약');
+  console.log('?뱤 議고쉶 寃곌낵 ?붿빟');
   console.log('='.repeat(60));
   
   if (response.response && response.response.header) {
     const header = response.response.header;
-    console.log(`   📄 결과코드: ${header.resultCode}`);
-    console.log(`   📝 결과메시지: ${header.resultMsg}`);
+    console.log(`   ?뱞 寃곌낵肄붾뱶: ${header.resultCode}`);
+    console.log(`   ?뱷 寃곌낵硫붿떆吏: ${header.resultMsg}`);
   }
   
   if (response.response && response.response.body) {
     const body = response.response.body;
-    console.log(`   📊 전체 데이터: ${body.totalCount?.toLocaleString() || 'N/A'}개`);
-    console.log(`   📄 현재 페이지: ${body.pageNo || 1}`);
-    console.log(`   🔢 페이지당 개수: ${body.numOfRows || 10}`);
+    console.log(`   ?뱤 ?꾩껜 ?곗씠?? ${body.totalCount?.toLocaleString() || 'N/A'}媛?);
+    console.log(`   ?뱞 ?꾩옱 ?섏씠吏: ${body.pageNo || 1}`);
+    console.log(`   ?뵢 ?섏씠吏??媛쒖닔: ${body.numOfRows || 10}`);
   }
 }
 
 /**
- * 메인 테스트
+ * 硫붿씤 ?뚯뒪??
  */
 async function runTests() {
-  console.log('🚫 전국주정차금지구역 API 테스트');
+  console.log('?슟 ?꾧뎅二쇱젙李④툑吏援ъ뿭 API ?뚯뒪??);
   console.log('='.repeat(60));
 
   if (!API_KEY || API_KEY === 'your_no_parking_zone_api_key_here') {
-    console.error('❌ NO_PARKING_ZONE_API_KEY가 설정되지 않았습니다.');
-    console.log('   .env 파일에 API 키를 입력해주세요.');
+    console.error('??NO_PARKING_ZONE_API_KEY媛 ?ㅼ젙?섏? ?딆븯?듬땲??');
+    console.log('   .env ?뚯씪??API ?ㅻ? ?낅젰?댁＜?몄슂.');
     return;
   }
 
-  console.log('✅ API 키 확인됨');
+  console.log('??API ???뺤씤??);
 
   try {
-    // 테스트 1: 기본 조회
-    console.log('\n\n🧪 테스트 1: 기본 조회 (첫 페이지 10개)');
+    // ?뚯뒪??1: 湲곕낯 議고쉶
+    console.log('\n\n?㎦ ?뚯뒪??1: 湲곕낯 議고쉶 (泥??섏씠吏 10媛?');
     const result1 = await getNoParakingZones({ pageNo: 1, numOfRows: 10 });
     displaySummary(result1);
     
     const items1 = result1.response?.body?.items || [];
     if (items1.length > 0) {
-      console.log('\n📋 주정차금지구역 목록:');
+      console.log('\n?뱥 二쇱젙李④툑吏援ъ뿭 紐⑸줉:');
       items1.slice(0, 5).forEach((zone, idx) => displayZone(zone, idx));
       if (items1.length > 5) {
-        console.log(`\n   ... 외 ${items1.length - 5}개`);
+        console.log(`\n   ... ??${items1.length - 5}媛?);
       }
     } else {
-      console.log('\n⚠️  데이터가 없습니다.');
-      console.log('   응답 구조:', JSON.stringify(result1, null, 2).slice(0, 500));
+      console.log('\n?좑툘  ?곗씠?곌? ?놁뒿?덈떎.');
+      console.log('   ?묐떟 援ъ“:', JSON.stringify(result1, null, 2).slice(0, 500));
     }
 
-    // 테스트 2: 서울시 조회
-    console.log('\n\n🧪 테스트 2: 서울특별시 주정차금지구역');
+    // ?뚯뒪??2: ?쒖슱??議고쉶
+    console.log('\n\n?㎦ ?뚯뒪??2: ?쒖슱?밸퀎??二쇱젙李④툑吏援ъ뿭');
     const result2 = await getNoParakingZones({ 
       pageNo: 1, 
       numOfRows: 20,
-      ctprvnNm: '서울특별시'
+      ctprvnNm: '?쒖슱?밸퀎??
     });
     displaySummary(result2);
     
     const items2 = result2.response?.body?.items || [];
     if (items2.length > 0) {
-      console.log('\n📋 서울시 금지구역 목록:');
+      console.log('\n?뱥 ?쒖슱??湲덉?援ъ뿭 紐⑸줉:');
       items2.slice(0, 5).forEach((zone, idx) => displayZone(zone, idx));
     }
 
-    // 테스트 3: 강남구 조회
-    console.log('\n\n🧪 테스트 3: 서울 강남구 주정차금지구역');
+    // ?뚯뒪??3: 媛뺣궓援?議고쉶
+    console.log('\n\n?㎦ ?뚯뒪??3: ?쒖슱 媛뺣궓援?二쇱젙李④툑吏援ъ뿭');
     const result3 = await getNoParakingZones({ 
       pageNo: 1, 
       numOfRows: 50,
-      ctprvnNm: '서울특별시',
-      signguNm: '강남구'
+      ctprvnNm: '?쒖슱?밸퀎??,
+      signguNm: '媛뺣궓援?
     });
     displaySummary(result3);
     
     const items3 = result3.response?.body?.items || [];
     if (items3.length > 0) {
-      console.log('\n📋 강남구 금지구역 목록:');
+      console.log('\n?뱥 媛뺣궓援?湲덉?援ъ뿭 紐⑸줉:');
       items3.slice(0, 5).forEach((zone, idx) => displayZone(zone, idx));
 
-      // 테스트 4: 특정 좌표 주변 금지구역
-      console.log('\n\n🧪 테스트 4: 강남역 주변 500m 내 금지구역');
+      // ?뚯뒪??4: ?뱀젙 醫뚰몴 二쇰? 湲덉?援ъ뿭
+      console.log('\n\n?㎦ ?뚯뒪??4: 媛뺣궓??二쇰? 500m ??湲덉?援ъ뿭');
       const gangnamStation = { lat: 37.497942, lng: 127.027619 };
       const nearbyZones = filterByDistance(items3, gangnamStation.lat, gangnamStation.lng, 0.5);
       
-      console.log(`\n📍 강남역 (${gangnamStation.lat}, ${gangnamStation.lng}) 기준`);
-      console.log(`🔍 반경 500m 내 금지구역: ${nearbyZones.length}개`);
+      console.log(`\n?뱧 媛뺣궓??(${gangnamStation.lat}, ${gangnamStation.lng}) 湲곗?`);
+      console.log(`?뵇 諛섍꼍 500m ??湲덉?援ъ뿭: ${nearbyZones.length}媛?);
       
       if (nearbyZones.length > 0) {
-        console.log('\n📋 가까운 순 금지구역:');
+        console.log('\n?뱥 媛源뚯슫 ??湲덉?援ъ뿭:');
         nearbyZones.slice(0, 5).forEach((zone, idx) => displayZone(zone, idx));
       }
     }
 
-    console.log('\n\n✅ 모든 테스트 완료!');
+    console.log('\n\n??紐⑤뱺 ?뚯뒪???꾨즺!');
 
   } catch (error) {
-    console.error('\n❌ 테스트 실패:', error.message);
+    console.error('\n???뚯뒪???ㅽ뙣:', error.message);
     
     if (error.message.includes('401') || error.message.includes('403')) {
-      console.log('\n💡 인증 오류 - Encoding/Decoding 키 둘 다 시도해보세요.');
+      console.log('\n?뮕 ?몄쬆 ?ㅻ쪟 - Encoding/Decoding ???????쒕룄?대낫?몄슂.');
     }
   }
 }
 
-// 실행
+// ?ㅽ뻾
 runTests();

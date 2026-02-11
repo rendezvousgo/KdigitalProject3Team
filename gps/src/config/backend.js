@@ -1,4 +1,3 @@
-// Backend API base URL
-// Use your PC's local IP address so the phone can access it over Wi?Fi.
-// Example: http://192.168.0.10:8080
-export const BACKEND_BASE_URL = 'http://본인아이피:8080';
+// Backend API base URL — api.js의 API_BASE_URL과 동일하게 맞춤
+import { API_BASE_URL } from './api';
+export const BACKEND_BASE_URL = API_BASE_URL;

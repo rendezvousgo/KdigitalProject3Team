@@ -1,13 +1,13 @@
-/**
- * SafeParking - API 유틸리티 함수
+﻿/**
+ * SafeParking - API ?좏떥由ы떚 ?⑥닔
  * 
- * 실제 앱에서 사용할 API 래퍼 함수들
+ * ?ㅼ젣 ?깆뿉???ъ슜??API ?섑띁 ?⑥닔??
  */
 
 require('dotenv').config();
 const fetch = require('node-fetch');
 
-// API 설정
+// API ?ㅼ젙
 const CONFIG = {
   kakao: {
     baseUrl: 'https://apis-navi.kakaomobility.com/v1',
@@ -21,16 +21,16 @@ const CONFIG = {
 
 /**
  * ============================================
- * 카카오 모빌리티 API
+ * 移댁뭅??紐⑤퉴由ы떚 API
  * ============================================
  */
 
 /**
- * 자동차 길찾기
- * @param {Object} origin - 출발지 { x, y, name? }
- * @param {Object} destination - 목적지 { x, y, name? }
- * @param {Object} options - 옵션
- * @returns {Promise<Object>} 경로 정보
+ * ?먮룞李?湲몄갼湲?
+ * @param {Object} origin - 異쒕컻吏 { x, y, name? }
+ * @param {Object} destination - 紐⑹쟻吏 { x, y, name? }
+ * @param {Object} options - ?듭뀡
+ * @returns {Promise<Object>} 寃쎈줈 ?뺣낫
  */
 async function getDirections(origin, destination, options = {}) {
   const params = new URLSearchParams({
@@ -62,7 +62,7 @@ async function getDirections(origin, destination, options = {}) {
 }
 
 /**
- * 경로 요약 정보 추출
+ * 寃쎈줈 ?붿빟 ?뺣낫 異붿텧
  */
 function extractRouteSummary(directionsResult) {
   if (!directionsResult.routes || directionsResult.routes.length === 0) {
@@ -76,9 +76,9 @@ function extractRouteSummary(directionsResult) {
 
   const summary = route.summary;
   return {
-    distance: summary.distance, // 미터
+    distance: summary.distance, // 誘명꽣
     distanceKm: (summary.distance / 1000).toFixed(1),
-    duration: summary.duration, // 초
+    duration: summary.duration, // 珥?
     durationMin: Math.round(summary.duration / 60),
     durationText: formatDuration(summary.duration),
     taxiFare: summary.fare.taxi,
@@ -91,19 +91,19 @@ function formatDuration(seconds) {
   const mins = Math.round(seconds / 60);
   const hours = Math.floor(mins / 60);
   const remainMins = mins % 60;
-  return hours > 0 ? `${hours}시간 ${remainMins}분` : `${remainMins}분`;
+  return hours > 0 ? `${hours}?쒓컙 ${remainMins}遺? : `${remainMins}遺?;
 }
 
 /**
  * ============================================
- * 공공데이터 - 주차장 API
+ * 怨듦났?곗씠??- 二쇱감??API
  * ============================================
  */
 
 /**
- * 주차장 목록 조회
- * @param {Object} options - 조회 옵션
- * @returns {Promise<Object>} 주차장 목록
+ * 二쇱감??紐⑸줉 議고쉶
+ * @param {Object} options - 議고쉶 ?듭뀡
+ * @returns {Promise<Object>} 二쇱감??紐⑸줉
  */
 async function getParkingLots(options = {}) {
   const params = new URLSearchParams({
@@ -113,10 +113,10 @@ async function getParkingLots(options = {}) {
   });
 
   if (options.region) {
-    params.append('cond[지역구분::EQ]', options.region);
+    params.append('cond[吏??뎄遺?:EQ]', options.region);
   }
   if (options.subRegion) {
-    params.append('cond[지역구분_sub::EQ]', options.subRegion);
+    params.append('cond[吏??뎄遺?sub::EQ]', options.subRegion);
   }
 
   const response = await fetch(`${CONFIG.parking.baseUrl}?${params}`, {
@@ -128,14 +128,14 @@ async function getParkingLots(options = {}) {
 }
 
 /**
- * 특정 좌표 주변 주차장 검색
- * @param {number} lat - 위도
- * @param {number} lng - 경도
- * @param {number} radiusKm - 검색 반경 (km)
- * @param {Object} options - 추가 옵션
+ * ?뱀젙 醫뚰몴 二쇰? 二쇱감??寃??
+ * @param {number} lat - ?꾨룄
+ * @param {number} lng - 寃쎈룄
+ * @param {number} radiusKm - 寃??諛섍꼍 (km)
+ * @param {Object} options - 異붽? ?듭뀡
  */
 async function findNearbyParkingLots(lat, lng, radiusKm = 1, options = {}) {
-  // 전체 데이터에서 필터링 (공공데이터 API는 위치검색 미지원)
+  // ?꾩껜 ?곗씠?곗뿉???꾪꽣留?(怨듦났?곗씠??API???꾩튂寃??誘몄???
   const result = await getParkingLots({
     page: 1,
     perPage: 1000,
@@ -147,22 +147,22 @@ async function findNearbyParkingLots(lat, lng, radiusKm = 1, options = {}) {
 
   return result.data
     .map(lot => {
-      const lotLat = parseFloat(lot['위도']);
-      const lotLng = parseFloat(lot['경도']);
+      const lotLat = parseFloat(lot['?꾨룄']);
+      const lotLng = parseFloat(lot['寃쎈룄']);
       if (isNaN(lotLat) || isNaN(lotLng)) return null;
 
       const distance = calculateDistance(lat, lng, lotLat, lotLng);
       return {
-        id: lot['주차장관리번호'],
-        name: lot['주차장명'],
-        address: lot['주차장도로명주소'] || lot['주차장지번주소'],
-        type: lot['주차장구분'],
-        capacity: parseInt(lot['주차구획수']) || 0,
-        feeInfo: lot['요금정보'],
-        weekdayHours: `${lot['평일운영시작시각'] || '?'} ~ ${lot['평일운영종료시각'] || '?'}`,
-        saturdayHours: `${lot['토요일운영시작시각'] || '?'} ~ ${lot['토요일운영종료시각'] || '?'}`,
-        holidayHours: `${lot['공휴일운영시작시각'] || '?'} ~ ${lot['공휴일운영종료시각'] || '?'}`,
-        phone: lot['연락처'],
+        id: lot['二쇱감?κ?由щ쾲??],
+        name: lot['二쇱감?λ챸'],
+        address: lot['二쇱감?λ룄濡쒕챸二쇱냼'] || lot['二쇱감?μ?踰덉＜??],
+        type: lot['二쇱감?κ뎄遺?],
+        capacity: parseInt(lot['二쇱감援ы쉷??]) || 0,
+        feeInfo: lot['?붽툑?뺣낫'],
+        weekdayHours: `${lot['?됱씪?댁쁺?쒖옉?쒓컖'] || '?'} ~ ${lot['?됱씪?댁쁺醫낅즺?쒓컖'] || '?'}`,
+        saturdayHours: `${lot['?좎슂?쇱슫?곸떆?묒떆媛?] || '?'} ~ ${lot['?좎슂?쇱슫?곸쥌猷뚯떆媛?] || '?'}`,
+        holidayHours: `${lot['怨듯쑕?쇱슫?곸떆?묒떆媛?] || '?'} ~ ${lot['怨듯쑕?쇱슫?곸쥌猷뚯떆媛?] || '?'}`,
+        phone: lot['?곕씫泥?],
         lat: lotLat,
         lng: lotLng,
         distance: distance, // km
@@ -174,7 +174,7 @@ async function findNearbyParkingLots(lat, lng, radiusKm = 1, options = {}) {
 }
 
 /**
- * 두 좌표 간 거리 계산 (Haversine)
+ * ??醫뚰몴 媛?嫄곕━ 怨꾩궛 (Haversine)
  */
 function calculateDistance(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -192,27 +192,27 @@ function toRad(deg) {
 
 /**
  * ============================================
- * 통합 기능
+ * ?듯빀 湲곕뒫
  * ============================================
  */
 
 /**
- * 목적지 근처 안전한 주차장 찾기 + 경로 안내
- * (단속카메라 회피 기능은 추후 구현)
+ * 紐⑹쟻吏 洹쇱쿂 ?덉쟾??二쇱감??李얘린 + 寃쎈줈 ?덈궡
+ * (?⑥냽移대찓???뚰뵾 湲곕뒫? 異뷀썑 援ы쁽)
  */
 async function findSafeParkingWithRoute(currentLocation, destination, options = {}) {
-  // 1. 목적지 주변 주차장 검색
+  // 1. 紐⑹쟻吏 二쇰? 二쇱감??寃??
   const nearbyParkings = await findNearbyParkingLots(
     destination.lat,
     destination.lng,
-    options.searchRadius || 0.5 // 기본 500m
+    options.searchRadius || 0.5 // 湲곕낯 500m
   );
 
   if (nearbyParkings.length === 0) {
-    return { success: false, message: '주변 주차장을 찾을 수 없습니다.' };
+    return { success: false, message: '二쇰? 二쇱감?μ쓣 李얠쓣 ???놁뒿?덈떎.' };
   }
 
-  // 2. 각 주차장까지의 경로 계산
+  // 2. 媛?二쇱감?κ퉴吏??寃쎈줈 怨꾩궛
   const parkingsWithRoute = await Promise.all(
     nearbyParkings.slice(0, 5).map(async (parking) => {
       try {
@@ -229,11 +229,11 @@ async function findSafeParkingWithRoute(currentLocation, destination, options = 
     })
   );
 
-  // 3. 정렬 (거리 + 소요시간 고려)
+  // 3. ?뺣젹 (嫄곕━ + ?뚯슂?쒓컙 怨좊젮)
   const sorted = parkingsWithRoute
     .filter(p => p.route && !p.route.error)
     .sort((a, b) => {
-      // 도보거리와 운전시간 가중 평균
+      // ?꾨낫嫄곕━? ?댁쟾?쒓컙 媛以??됯퇏
       const scoreA = a.distance * 0.5 + (a.route.durationMin / 60) * 0.5;
       const scoreB = b.distance * 0.5 + (b.route.durationMin / 60) * 0.5;
       return scoreA - scoreB;
@@ -243,23 +243,23 @@ async function findSafeParkingWithRoute(currentLocation, destination, options = 
     success: true,
     totalFound: nearbyParkings.length,
     recommendations: sorted.slice(0, 3),
-    message: `${nearbyParkings.length}개의 주차장을 찾았습니다.`,
+    message: `${nearbyParkings.length}媛쒖쓽 二쇱감?μ쓣 李얠븯?듬땲??`,
   };
 }
 
-// 모듈 내보내기
+// 紐⑤뱢 ?대낫?닿린
 module.exports = {
-  // 카카오
+  // 移댁뭅??
   getDirections,
   extractRouteSummary,
   
-  // 주차장
+  // 二쇱감??
   getParkingLots,
   findNearbyParkingLots,
   
-  // 통합
+  // ?듯빀
   findSafeParkingWithRoute,
   
-  // 유틸
+  // ?좏떥
   calculateDistance,
 };
