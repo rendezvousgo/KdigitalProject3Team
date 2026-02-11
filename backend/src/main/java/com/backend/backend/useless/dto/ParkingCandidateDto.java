@@ -1,4 +1,4 @@
-package com.backend.backend.dto;
+package com.backend.backend.useless.dto;
 
 public class ParkingCandidateDto {
     private String parkingName;

@@ -1,8 +1,8 @@
-package com.backend.backend.service;
+package com.backend.backend.useless.service;
 
 import com.backend.backend.config.KakaoApiProperties;
 import com.backend.backend.config.ParkingApiProperties;
-import com.backend.backend.dto.ParkingCandidateDto;
+import com.backend.backend.useless.dto.ParkingCandidateDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;

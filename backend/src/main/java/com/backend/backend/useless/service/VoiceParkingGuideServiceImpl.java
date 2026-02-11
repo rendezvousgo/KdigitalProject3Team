@@ -1,9 +1,10 @@
-package com.backend.backend.service;
+﻿package com.backend.backend.useless.service;
 
-import com.backend.backend.dto.ParkingCandidateDto;
-import com.backend.backend.dto.VoiceGuideRequestDto;
-import com.backend.backend.dto.VoiceGuideResponseDto;
 import org.springframework.stereotype.Service;
+
+import com.backend.backend.useless.dto.ParkingCandidateDto;
+import com.backend.backend.useless.dto.VoiceGuideRequestDto;
+import com.backend.backend.useless.dto.VoiceGuideResponseDto;
 
 @Service
 public class VoiceParkingGuideServiceImpl implements VoiceParkingGuideService {

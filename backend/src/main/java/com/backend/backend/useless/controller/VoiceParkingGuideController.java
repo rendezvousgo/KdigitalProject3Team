@@ -1,8 +1,9 @@
-package com.backend.backend.controller;
+package com.backend.backend.useless.controller;
 
-import com.backend.backend.dto.VoiceGuideRequestDto;
-import com.backend.backend.dto.VoiceGuideResponseDto;
-import com.backend.backend.service.VoiceParkingGuideService;
+import com.backend.backend.useless.dto.VoiceGuideRequestDto;
+import com.backend.backend.useless.dto.VoiceGuideResponseDto;
+import com.backend.backend.useless.service.VoiceParkingGuideService;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
