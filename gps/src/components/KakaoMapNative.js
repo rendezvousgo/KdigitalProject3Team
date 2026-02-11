@@ -94,6 +94,16 @@ function generateHTML(lat, lng) {
       if (map) map.panTo(new kakao.maps.LatLng(lat, lng));
     }
 
+    function setCenter(lat, lng) {
+      if (!map) return;
+      map.setCenter(new kakao.maps.LatLng(lat, lng));
+    }
+
+    function setLevel(level) {
+      if (!map) return;
+      map.setLevel(level, { animate: true });
+    }
+
     function drawRoute(pathJSON) {
       clearRoute();
       var path = JSON.parse(pathJSON);
@@ -176,6 +186,12 @@ const KakaoMapNative = forwardRef(function KakaoMapNative(
   useImperativeHandle(ref, () => ({
     panTo: (lat, lng) => {
       webViewRef.current?.injectJavaScript(`panTo(${lat}, ${lng}); true;`);
+    },
+    setCenter: (lat, lng) => {
+      webViewRef.current?.injectJavaScript(`setCenter(${lat}, ${lng}); true;`);
+    },
+    setLevel: (level) => {
+      webViewRef.current?.injectJavaScript(`setLevel(${level}); true;`);
     },
     drawRoute: (path) => {
       webViewRef.current?.injectJavaScript(`drawRoute('${JSON.stringify(path)}'); true;`);

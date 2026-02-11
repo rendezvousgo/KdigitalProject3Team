@@ -134,6 +134,16 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
         mapRef.current.panTo(new window.kakao.maps.LatLng(lat, lng));
       }
     },
+    setCenter: (lat, lng) => {
+      if (mapRef.current && window.kakao) {
+        mapRef.current.setCenter(new window.kakao.maps.LatLng(lat, lng));
+      }
+    },
+    setLevel: (level) => {
+      if (mapRef.current) {
+        mapRef.current.setLevel(level, { animate: true });
+      }
+    },
     drawRoute: (path) => _drawRoute(path),
     clearRoute: () => _clearRoute(),
     relayout: () => {
