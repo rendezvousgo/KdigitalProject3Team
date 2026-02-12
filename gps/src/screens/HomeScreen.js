@@ -364,14 +364,25 @@ export default function HomeScreen({ navigation, route }) {
   };
 
 const goToMyLocation = async () => {
-  // 토글: 이미 활성화된 상태면 끄기
-  if (myLocationActive) {
-    setMyLocationActive(false);
-    if (kakaoMapRef.current?.hideMyLocation) {
-      kakaoMapRef.current.hideMyLocation();
+  const moveAndZoomToLevel4 = (latitude, longitude) => {
+    if (!kakaoMapRef.current) return;
+    setMapCenter({ latitude, longitude });
+    if (kakaoMapRef.current.focusMyLocation) {
+      kakaoMapRef.current.focusMyLocation(latitude, longitude, 4);
+      return;
     }
-    return;
-  }
+    if (kakaoMapRef.current.setCenter) {
+      kakaoMapRef.current.setCenter(latitude, longitude);
+    } else if (kakaoMapRef.current.panTo) {
+      kakaoMapRef.current.panTo(latitude, longitude);
+    }
+    if (kakaoMapRef.current.setLevel) {
+      kakaoMapRef.current.setLevel(4);
+    }
+    if (kakaoMapRef.current.showMyLocation) {
+      kakaoMapRef.current.showMyLocation(latitude, longitude);
+    }
+  };
 
   try {
     const Location = require('expo-location');
@@ -387,7 +398,7 @@ const goToMyLocation = async () => {
     const lastLoc = await Location.getLastKnownPositionAsync();
     if (lastLoc && kakaoMapRef.current) {
       const { latitude, longitude } = lastLoc.coords;
-      kakaoMapRef.current.panTo(latitude, longitude);
+      moveAndZoomToLevel4(latitude, longitude);
       // 일단 마지막 위치로 먼저 지도를 옮겨서 사용자를 안심시킵니다.
     }
 
@@ -403,12 +414,7 @@ const goToMyLocation = async () => {
     setMapCenter({ latitude: coords.latitude, longitude: coords.longitude });
     setMyLocationActive(true);
 
-    if (kakaoMapRef.current) {
-      kakaoMapRef.current.panTo(coords.latitude, coords.longitude);
-      if (kakaoMapRef.current.showMyLocation) {
-        kakaoMapRef.current.showMyLocation(coords.latitude, coords.longitude);
-      }
-    }
+    moveAndZoomToLevel4(coords.latitude, coords.longitude);
     // --- [최적화 끝] ---
 
   } catch (e) {
@@ -486,10 +492,10 @@ const goToMyLocation = async () => {
                 <Ionicons name={favoritePlaces.length > 0 ? 'heart' : 'heart-outline'} size={24} color="#E53935" />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.mapButton, myLocationActive && styles.mapButtonMyLocActive]}
+                style={styles.mapButton}
                 onPress={goToMyLocation}
               >
-                <MaterialIcons name="my-location" size={24} color={myLocationActive ? '#fff' : '#007AFF'} />
+                <MaterialIcons name="my-location" size={24} color="#007AFF" />
               </TouchableOpacity>
               {/* <TouchableOpacity 
                 style={styles.mapButton}

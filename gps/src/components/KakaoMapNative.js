@@ -1,4 +1,4 @@
-/**
+﻿/**
  * KakaoMapNative - Android용 카카오맵 (react-native-webview 기반)
  * 
  * WebView 안에서 카카오맵 JS SDK를 로드하여 지도를 표시합니다.
@@ -94,6 +94,15 @@ function generateHTML(lat, lng) {
       if (map) map.panTo(new kakao.maps.LatLng(lat, lng));
     }
 
+    function setCenter(lat, lng) {
+      if (map) map.setCenter(new kakao.maps.LatLng(lat, lng));
+    }
+
+    function setLevel(level) {
+      if (!map) return;
+      map.setLevel(level, { animate: true });
+    }
+
     function drawRoute(pathJSON) {
       clearRoute();
       var path = JSON.parse(pathJSON);
@@ -159,6 +168,16 @@ function generateHTML(lat, lng) {
     function hideMyLocation() {
       if (myLocOverlay) { myLocOverlay.setMap(null); myLocOverlay = null; }
     }
+
+    function focusMyLocation(lat, lng, level) {
+      if (!map) return;
+      var pos = new kakao.maps.LatLng(lat, lng);
+      map.setCenter(pos);
+      if (typeof level === 'number') {
+        map.setLevel(level, { animate: true });
+      }
+      showMyLocation(lat, lng);
+    }
   </script>
 </body>
 </html>`;
@@ -176,6 +195,15 @@ const KakaoMapNative = forwardRef(function KakaoMapNative(
   useImperativeHandle(ref, () => ({
     panTo: (lat, lng) => {
       webViewRef.current?.injectJavaScript(`panTo(${lat}, ${lng}); true;`);
+    },
+    setCenter: (lat, lng) => {
+      webViewRef.current?.injectJavaScript(`setCenter(${lat}, ${lng}); true;`);
+    },
+    setLevel: (level) => {
+      webViewRef.current?.injectJavaScript(`setLevel(${level}); true;`);
+    },
+    focusMyLocation: (lat, lng, level = 4) => {
+      webViewRef.current?.injectJavaScript(`focusMyLocation(${lat}, ${lng}, ${level}); true;`);
     },
     drawRoute: (path) => {
       webViewRef.current?.injectJavaScript(`drawRoute('${JSON.stringify(path)}'); true;`);
