@@ -134,6 +134,23 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
         mapRef.current.panTo(new window.kakao.maps.LatLng(lat, lng));
       }
     },
+    setCenter: (lat, lng) => {
+      if (mapRef.current && window.kakao) {
+        mapRef.current.setCenter(new window.kakao.maps.LatLng(lat, lng));
+      }
+    },
+    setLevel: (level) => {
+      if (mapRef.current) {
+        mapRef.current.setLevel(level, { animate: true });
+      }
+    },
+    focusMyLocation: (lat, lng, level = 4) => {
+      if (mapRef.current && window.kakao) {
+        const pos = new window.kakao.maps.LatLng(lat, lng);
+        mapRef.current.setCenter(pos);
+        mapRef.current.setLevel(level, { animate: true });
+      }
+    },
     drawRoute: (path) => _drawRoute(path),
     clearRoute: () => _clearRoute(),
     relayout: () => {
