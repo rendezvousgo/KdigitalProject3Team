@@ -247,25 +247,32 @@ export function formatDuration(seconds) {
   return hours > 0 ? `${hours}시간 ${remainMins}분` : `${remainMins}분`;
 }
 
-export async function favorite(payload) {
-  const response = await fetch(`${BACKEND_BASE_URL}/api/favorite`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload || {}),
+export async function favorite(parkingName) {
+  const params = new URLSearchParams({ parkingName: String(parkingName || '') });
+  const response = await fetch(`${BACKEND_BASE_URL}/api/favorite/check?${params.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
   });
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || 'favorite 요청 실패');
   }
-  const ct = response.headers.get('content-type') || '';
-  return ct.includes('application/json') ? response.json() : null;
+  return response.json();
 }
 
 export async function favoriteSave(payload) {
-  const response = await fetch(`${BACKEND_BASE_URL}/api/favoriteSave`, {
+  const body = {
+    parkingName: payload?.parkingName || payload?.name || '',
+    latitude: payload?.latitude ?? payload?.lat ?? null,
+    longitude: payload?.longitude ?? payload?.lng ?? null,
+    address: payload?.address || '',
+  };
+
+  const response = await fetch(`${BACKEND_BASE_URL}/api/favorite/add`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload || {}),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     const text = await response.text();
@@ -276,12 +283,10 @@ export async function favoriteSave(payload) {
 }
 
 export async function favoriteList(lat, lng) {
-  const params = new URLSearchParams();
-  if (lat != null) params.append('lat', String(lat));
-  if (lng != null) params.append('lng', String(lng));
-  const qs = params.toString();
-
-  const response = await fetch(`${BACKEND_BASE_URL}/api/favoriteList${qs ? `?${qs}` : ''}`);
+  const response = await fetch(`${BACKEND_BASE_URL}/api/favorite/list`, {
+    method: 'GET',
+    credentials: 'include',
+  });
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || 'favoriteList 요청 실패');
@@ -292,4 +297,17 @@ export async function favoriteList(lat, lng) {
   if (Array.isArray(data?.items)) return data.items;
   if (Array.isArray(data?.data)) return data.data;
   return [];
+}
+
+export async function favoriteRemove(parkingName) {
+  const params = new URLSearchParams({ parkingName: String(parkingName || '') });
+  const response = await fetch(`${BACKEND_BASE_URL}/api/favorite/remove?${params.toString()}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'favoriteRemove 요청 실패');
+  }
+  return true;
 }

@@ -14,10 +14,11 @@ import {
   FlatList,
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import { findNearbyParkingLots, formatDistance, formatDuration, favorite, favoriteSave, favoriteList } from '../services/api';
+import { findNearbyParkingLots, formatDistance, formatDuration, favorite, favoriteSave, favoriteList, favoriteRemove } from '../services/api';
 import { openKakaoNavi, fetchRoutePath } from '../services/navigation';
 import { initKNSDK, startNavigation as startKNSDKNavi, getKNSDKStatus, getKeyHash } from '../services/knsdkBridge';
 import { on } from '../services/eventBus';
+import { useAuth } from '../contexts/AuthContext';
 
 // 플랫폼별 분기
 import KakaoMapWeb from '../components/KakaoMapWeb';
@@ -31,6 +32,7 @@ const { width, height } = Dimensions.get('window');
 const DEFAULT_LOCATION = { latitude: 37.5665, longitude: 126.9780 };
 
 export default function HomeScreen({ navigation, route }) {
+  const { isLoggedIn } = useAuth();
   const [location, setLocation] = useState(null);
   const [selectedParking, setSelectedParking] = useState(null);
   const [parkings, setParkings] = useState([]);
@@ -53,7 +55,7 @@ export default function HomeScreen({ navigation, route }) {
   const [keyHashInfo, setKeyHashInfo] = useState(null);
 
   const getParkingKey = (parking) =>
-    String(parking?.id || `${parking?.name || ''}_${parking?.lat || ''}_${parking?.lng || ''}`);
+    String(parking?.name || parking?.parkingName || parking?.id || `${parking?.lat || ''}_${parking?.lng || ''}`);
 
   const getDistanceKm = (aLat, aLng, bLat, bLng) => {
     if ([aLat, aLng, bLat, bLng].some((v) => typeof v !== 'number' || Number.isNaN(v))) return Number.POSITIVE_INFINITY;
@@ -70,14 +72,15 @@ export default function HomeScreen({ navigation, route }) {
   const normalizeFavoriteItem = (item) => {
     const lat = Number(item.lat ?? item.latitude);
     const lng = Number(item.lng ?? item.longitude);
-    const key = String(item.parkingId ?? item.id ?? `${item.name || ''}_${lat}_${lng}`);
+    const name = item.parkingName || item.name || '주차장';
+    const key = String(name);
     const distanceKm = location
       ? getDistanceKm(location.latitude, location.longitude, lat, lng)
       : Number(item.distanceKm ?? item.distance ?? Number.POSITIVE_INFINITY);
 
     return {
       key,
-      name: item.name || '주차장',
+      name,
       address: item.address || '',
       tag: item.tag || '즐겨찾기한 장소',
       lat,
@@ -91,27 +94,14 @@ export default function HomeScreen({ navigation, route }) {
     return favoritePlaces.some((item) => item.key === key);
   };
 
-  const addLocalFavorite = (parking) => {
-    const localItem = normalizeFavoriteItem({
-      parkingId: parking?.id || null,
-      name: parking?.name || '주차장',
-      address: parking?.address || '',
-      lat: parking?.lat,
-      lng: parking?.lng,
-      tag: '즐겨찾기한 장소',
-    });
-
-    setFavoritePlaces((prev) => {
-      const exists = prev.some((item) => item.key === localItem.key);
-      if (exists) return prev;
-      return [...prev, localItem].sort((a, b) => a.distanceKm - b.distanceKm);
-    });
-  };
-
   const loadFavoritePlaces = async () => {
+    if (!isLoggedIn) {
+      setFavoritePlaces([]);
+      return;
+    }
     setFavoriteLoading(true);
     try {
-      const rows = await favoriteList(location?.latitude, location?.longitude);
+      const rows = await favoriteList();
       setFavoritePlaces(
         rows
           .map(normalizeFavoriteItem)
@@ -120,42 +110,76 @@ export default function HomeScreen({ navigation, route }) {
       );
     } catch (error) {
       console.error('favoriteList 실패:', error);
-      // 서버가 없을 때는 로컬 임시 데이터 목록을 그대로 사용한다.
+      Alert.alert('즐겨찾기', '즐겨찾기 목록을 불러오지 못했습니다.');
     } finally {
       setFavoriteLoading(false);
     }
   };
 
+  const handleFavoriteRemove = async (parkingOrName) => {
+    if (!isLoggedIn) {
+      Alert.alert('안내', '로그인 후 이용해주세요.');
+      return;
+    }
+    const parkingName = typeof parkingOrName === 'string'
+      ? parkingOrName
+      : (parkingOrName?.name || parkingOrName?.parkingName || '');
+    if (!parkingName) return;
+    try {
+      await favoriteRemove(parkingName);
+      await loadFavoritePlaces();
+    } catch (error) {
+      console.error('favoriteRemove 실패:', error);
+      Alert.alert('즐겨찾기', '해제에 실패했습니다.');
+    }
+  };
+
   const handleFavoriteSave = async (parking) => {
-    if (isFavoriteParking(parking)) {
-      Alert.alert('즐겨찾기', '이미 저장된 주차장입니다.');
+    if (!isLoggedIn) {
+      Alert.alert('안내', '로그인 후 이용해주세요.');
+      return;
+    }
+
+    if (!parking?.name) return;
+
+    const serverFavorited = await favorite(parking.name).catch(() => isFavoriteParking(parking));
+    if (serverFavorited) {
+      await handleFavoriteRemove(parking.name);
       return;
     }
 
     const payload = {
-      parkingId: parking?.id || null,
-      name: parking?.name || '주차장',
+      parkingName: parking?.name || '주차장',
       address: parking?.address || '',
-      lat: parking?.lat,
-      lng: parking?.lng,
-      tag: '즐겨찾기한 장소',
+      latitude: parking?.lat,
+      longitude: parking?.lng,
     };
     try {
-      await favorite(payload);
       await favoriteSave(payload);
       await loadFavoritePlaces();
       Alert.alert('즐겨찾기', '즐겨찾기한 장소로 저장되었습니다.');
     } catch (error) {
       console.error('favorite 저장 실패:', error);
-      addLocalFavorite(parking);
-      Alert.alert('즐겨찾기', '서버 연결 없이 임시 데이터로 저장했습니다.');
+      Alert.alert('저장 실패', '즐겨찾기 저장에 실패했습니다.');
     }
   };
 
   const openFavoriteModal = () => {
+    if (!isLoggedIn) {
+      Alert.alert('안내', '로그인 후 이용해주세요.');
+      return;
+    }
     setFavoriteModalVisible(true);
     loadFavoritePlaces();
   };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadFavoritePlaces();
+    } else {
+      setFavoritePlaces([]);
+    }
+  }, [isLoggedIn]);
 
   // 위치 권한 → GPS 취득 → KNSDK 초기화 (순서 보장)
   useEffect(() => {
@@ -637,9 +661,7 @@ const goToMyLocation = async () => {
                       size={22}
                       color={isFavoriteParking(selectedParking) ? '#E53935' : '#007AFF'}
                     />
-                    <Text style={[styles.parkingActionText, styles.secondaryButtonText]}>
-                      {isFavoriteParking(selectedParking) ? '즐겨찾기됨' : '즐겨찾기'}
-                    </Text>
+                    <Text style={[styles.parkingActionText, styles.secondaryButtonText]}>즐겨찾기</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -691,6 +713,12 @@ const goToMyLocation = async () => {
                     <Text style={styles.favoriteDist}>
                       {Number.isFinite(item.distanceKm) ? formatDistance(item.distanceKm * 1000) : '-'}
                     </Text>
+                    <TouchableOpacity
+                      style={styles.favoriteTrashBtn}
+                      onPress={() => handleFavoriteRemove(item.name)}
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#E53935" />
+                    </TouchableOpacity>
                   </TouchableOpacity>
                 )}
                 ListEmptyComponent={<Text style={styles.favoriteEmptyText}>저장된 즐겨찾기한 장소가 없습니다.</Text>}
@@ -1233,6 +1261,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#1A1A2E',
+  },
+  favoriteTrashBtn: {
+    marginLeft: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FCEBEC',
   },
   favoriteEmpty: {
     minHeight: 120,
