@@ -1,9 +1,10 @@
-﻿package com.backend.backend;
+package com.backend.backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+
 import com.backend.backend.config.KakaoApiProperties;
 import com.backend.backend.config.ParkingApiProperties;
 
@@ -12,8 +13,8 @@ import com.backend.backend.config.ParkingApiProperties;
 @EnableConfigurationProperties({ParkingApiProperties.class, KakaoApiProperties.class})
 public class BackendApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(BackendApplication.class, args);
-    }
+	public static void main(String[] args) {
+		SpringApplication.run(BackendApplication.class, args);
+	}
 
 }
