@@ -5,6 +5,7 @@
 //음성시스템
 
 import { KAKAO_REST_API_KEY, PARKING_API_KEY } from '../config/keys';
+import { BACKEND_BASE_URL } from '../config/backend';
 
 const KAKAO_API_KEY = KAKAO_REST_API_KEY;
 
@@ -244,4 +245,51 @@ export function formatDuration(seconds) {
   const hours = Math.floor(mins / 60);
   const remainMins = mins % 60;
   return hours > 0 ? `${hours}시간 ${remainMins}분` : `${remainMins}분`;
+}
+
+export async function favorite(payload) {
+  const response = await fetch(`${BACKEND_BASE_URL}/api/favorite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'favorite 요청 실패');
+  }
+  const ct = response.headers.get('content-type') || '';
+  return ct.includes('application/json') ? response.json() : null;
+}
+
+export async function favoriteSave(payload) {
+  const response = await fetch(`${BACKEND_BASE_URL}/api/favoriteSave`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'favoriteSave 요청 실패');
+  }
+  const ct = response.headers.get('content-type') || '';
+  return ct.includes('application/json') ? response.json() : null;
+}
+
+export async function favoriteList(lat, lng) {
+  const params = new URLSearchParams();
+  if (lat != null) params.append('lat', String(lat));
+  if (lng != null) params.append('lng', String(lng));
+  const qs = params.toString();
+
+  const response = await fetch(`${BACKEND_BASE_URL}/api/favoriteList${qs ? `?${qs}` : ''}`);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'favoriteList 요청 실패');
+  }
+
+  const data = await response.json();
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
 }

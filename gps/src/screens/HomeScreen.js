@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,11 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import { findNearbyParkingLots, formatDistance, formatDuration } from '../services/api';
+import { findNearbyParkingLots, formatDistance, formatDuration, favorite, favoriteSave, favoriteList } from '../services/api';
 import { openKakaoNavi, fetchRoutePath } from '../services/navigation';
 import { initKNSDK, startNavigation as startKNSDKNavi, getKNSDKStatus, getKeyHash } from '../services/knsdkBridge';
 import { on } from '../services/eventBus';
@@ -42,10 +44,118 @@ export default function HomeScreen({ navigation, route }) {
   const bottomSheetAnim = useRef(new Animated.Value(0)).current;
   const [mapCenter, setMapCenter] = useState(DEFAULT_LOCATION);
   const [myLocationActive, setMyLocationActive] = useState(false);
+  const [favoritePlaces, setFavoritePlaces] = useState([]);
+  const [favoriteModalVisible, setFavoriteModalVisible] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   const [knsdkStatus, setKnsdkStatus] = useState('초기화 대기');
   const [knsdkReady, setKnsdkReady] = useState(false);
   const [keyHashInfo, setKeyHashInfo] = useState(null);
+
+  const getParkingKey = (parking) =>
+    String(parking?.id || `${parking?.name || ''}_${parking?.lat || ''}_${parking?.lng || ''}`);
+
+  const getDistanceKm = (aLat, aLng, bLat, bLng) => {
+    if ([aLat, aLng, bLat, bLng].some((v) => typeof v !== 'number' || Number.isNaN(v))) return Number.POSITIVE_INFINITY;
+    const R = 6371;
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const dLat = toRad(bLat - aLat);
+    const dLng = toRad(bLng - aLng);
+    const x =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  };
+
+  const normalizeFavoriteItem = (item) => {
+    const lat = Number(item.lat ?? item.latitude);
+    const lng = Number(item.lng ?? item.longitude);
+    const key = String(item.parkingId ?? item.id ?? `${item.name || ''}_${lat}_${lng}`);
+    const distanceKm = location
+      ? getDistanceKm(location.latitude, location.longitude, lat, lng)
+      : Number(item.distanceKm ?? item.distance ?? Number.POSITIVE_INFINITY);
+
+    return {
+      key,
+      name: item.name || '주차장',
+      address: item.address || '',
+      tag: item.tag || '즐겨찾기한 장소',
+      lat,
+      lng,
+      distanceKm,
+    };
+  };
+
+  const isFavoriteParking = (parking) => {
+    const key = getParkingKey(parking);
+    return favoritePlaces.some((item) => item.key === key);
+  };
+
+  const addLocalFavorite = (parking) => {
+    const localItem = normalizeFavoriteItem({
+      parkingId: parking?.id || null,
+      name: parking?.name || '주차장',
+      address: parking?.address || '',
+      lat: parking?.lat,
+      lng: parking?.lng,
+      tag: '즐겨찾기한 장소',
+    });
+
+    setFavoritePlaces((prev) => {
+      const exists = prev.some((item) => item.key === localItem.key);
+      if (exists) return prev;
+      return [...prev, localItem].sort((a, b) => a.distanceKm - b.distanceKm);
+    });
+  };
+
+  const loadFavoritePlaces = async () => {
+    setFavoriteLoading(true);
+    try {
+      const rows = await favoriteList(location?.latitude, location?.longitude);
+      setFavoritePlaces(
+        rows
+          .map(normalizeFavoriteItem)
+          .filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lng))
+          .sort((a, b) => a.distanceKm - b.distanceKm)
+      );
+    } catch (error) {
+      console.error('favoriteList 실패:', error);
+      // 서버가 없을 때는 로컬 임시 데이터 목록을 그대로 사용한다.
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
+  const handleFavoriteSave = async (parking) => {
+    if (isFavoriteParking(parking)) {
+      Alert.alert('즐겨찾기', '이미 저장된 주차장입니다.');
+      return;
+    }
+
+    const payload = {
+      parkingId: parking?.id || null,
+      name: parking?.name || '주차장',
+      address: parking?.address || '',
+      lat: parking?.lat,
+      lng: parking?.lng,
+      tag: '즐겨찾기한 장소',
+    };
+    try {
+      await favorite(payload);
+      await favoriteSave(payload);
+      await loadFavoritePlaces();
+      Alert.alert('즐겨찾기', '즐겨찾기한 장소로 저장되었습니다.');
+    } catch (error) {
+      console.error('favorite 저장 실패:', error);
+      addLocalFavorite(parking);
+      Alert.alert('즐겨찾기', '서버 연결 없이 임시 데이터로 저장했습니다.');
+    }
+  };
+
+  const openFavoriteModal = () => {
+    setFavoriteModalVisible(true);
+    loadFavoritePlaces();
+  };
 
   // 위치 권한 → GPS 취득 → KNSDK 초기화 (순서 보장)
   useEffect(() => {
@@ -370,6 +480,12 @@ const goToMyLocation = async () => {
                 </TouchableOpacity>
               )}
               <TouchableOpacity
+                style={styles.mapButton}
+                onPress={openFavoriteModal}
+              >
+                <Ionicons name={favoritePlaces.length > 0 ? 'heart' : 'heart-outline'} size={24} color="#E53935" />
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.mapButton, myLocationActive && styles.mapButtonMyLocActive]}
                 onPress={goToMyLocation}
               >
@@ -506,9 +622,18 @@ const goToMyLocation = async () => {
                       <Text style={styles.parkingActionText}>내비 시작</Text>
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity style={[styles.parkingActionButton, styles.secondaryButton]}>
-                    <MaterialIcons name="favorite-border" size={24} color="#007AFF" />
-                    <Text style={[styles.parkingActionText, styles.secondaryButtonText]}>즐겨찾기</Text>
+                  <TouchableOpacity
+                    style={[styles.parkingActionButton, styles.secondaryButton]}
+                    onPress={() => handleFavoriteSave(selectedParking)}
+                  >
+                    <Ionicons
+                      name={isFavoriteParking(selectedParking) ? 'heart' : 'heart-outline'}
+                      size={22}
+                      color={isFavoriteParking(selectedParking) ? '#E53935' : '#007AFF'}
+                    />
+                    <Text style={[styles.parkingActionText, styles.secondaryButtonText]}>
+                      {isFavoriteParking(selectedParking) ? '즐겨찾기됨' : '즐겨찾기'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -516,6 +641,58 @@ const goToMyLocation = async () => {
           </Animated.View>
         </TouchableOpacity>
       )}
+
+      <Modal
+        visible={favoriteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFavoriteModalVisible(false)}
+      >
+        <TouchableOpacity style={styles.favoriteModalOverlay} activeOpacity={1} onPress={() => setFavoriteModalVisible(false)}>
+          <TouchableOpacity style={styles.favoriteModalCard} activeOpacity={1}>
+            <View style={styles.favoriteHeader}>
+              <Text style={styles.favoriteTitle}>즐겨찾기한 장소</Text>
+              <TouchableOpacity onPress={() => setFavoriteModalVisible(false)}>
+                <Ionicons name="close" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+            {favoriteLoading ? (
+              <View style={styles.favoriteEmpty}>
+                <ActivityIndicator size="small" color="#E53935" />
+              </View>
+            ) : (
+              <FlatList
+                data={favoritePlaces}
+                keyExtractor={(item) => item.key}
+                style={styles.favoriteList}
+                contentContainerStyle={styles.favoriteListContent}
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity
+                    style={styles.favoriteItem}
+                    onPress={() => {
+                      setFavoriteModalVisible(false);
+                      if (Number.isFinite(item.lat) && Number.isFinite(item.lng)) {
+                        setMapCenter({ latitude: item.lat, longitude: item.lng });
+                        if (kakaoMapRef.current?.panTo) kakaoMapRef.current.panTo(item.lat, item.lng);
+                      }
+                    }}
+                  >
+                    <Text style={styles.favoriteIndex}>{index + 1}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.favoriteName}>{item.name}</Text>
+                      <Text style={styles.favoriteAddr} numberOfLines={1}>{item.address || item.tag}</Text>
+                    </View>
+                    <Text style={styles.favoriteDist}>
+                      {Number.isFinite(item.distanceKm) ? formatDistance(item.distanceKm * 1000) : '-'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={<Text style={styles.favoriteEmptyText}>저장된 즐겨찾기한 장소가 없습니다.</Text>}
+              />
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -986,5 +1163,79 @@ const styles = StyleSheet.create({
   },
   sdkStatusError: {
     color: '#FF9800',
+  },
+  favoriteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  favoriteModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '70%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 10,
+  },
+  favoriteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f1f1',
+  },
+  favoriteTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#222',
+  },
+  favoriteList: {
+    maxHeight: 420,
+  },
+  favoriteListContent: {
+    paddingVertical: 4,
+  },
+  favoriteItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+  },
+  favoriteIndex: {
+    width: 24,
+    textAlign: 'center',
+    color: '#E53935',
+    fontWeight: '700',
+  },
+  favoriteName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#222',
+  },
+  favoriteAddr: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#777',
+  },
+  favoriteDist: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1A1A2E',
+  },
+  favoriteEmpty: {
+    minHeight: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  favoriteEmptyText: {
+    textAlign: 'center',
+    color: '#666',
+    paddingVertical: 20,
   },
 });
