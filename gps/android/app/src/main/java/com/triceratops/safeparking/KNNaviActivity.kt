@@ -63,14 +63,56 @@ class KNNaviActivity : AppCompatActivity(),
     /**
      * 주행 경로를 요청합니다. (튜토리얼 Step 08-2)
      */
+    override fun onDestroy() {
+        super.onDestroy()
+        // ★ 이전 경로 잔존 방지: guidance 중지
+        try {
+            MainApplication.knsdk.sharedGuidance()?.stop()
+            Log.d(TAG, "Guidance 정리 완료")
+        } catch (e: Exception) {
+            Log.e(TAG, "Guidance 정리 오류: ${e.message}")
+        }
+    }
+
     fun requestRoute() {
+        // ★ 기존 경로/guidance 완전 정리 (이전 경로 잔존 방지)
+        try {
+            MainApplication.knsdk.sharedGuidance()?.stop()
+            Log.d(TAG, "기존 Guidance 정리 완료")
+        } catch (e: Exception) {
+            Log.w(TAG, "기존 Guidance 정리 중 오류 (무시): ${e.message}")
+        }
+
         val destName = intent.getStringExtra("dest_name") ?: "목적지"
         val destLng = intent.getIntExtra("dest_lng", 0)
         val destLat = intent.getIntExtra("dest_lat", 0)
         val startLng = intent.getIntExtra("start_lng", 0)
         val startLat = intent.getIntExtra("start_lat", 0)
 
-        Log.d(TAG, "경로 요청: start=($startLng,$startLat) → dest=$destName($destLng,$destLat)")
+        // ★ 경유지 파싱
+        val waypointsJson = intent.getStringExtra("waypoints_json")
+        var vias: MutableList<KNPOI>? = null
+        if (!waypointsJson.isNullOrEmpty()) {
+            try {
+                val jsonArray = org.json.JSONArray(waypointsJson)
+                val viaList = mutableListOf<KNPOI>()
+                for (i in 0 until jsonArray.length()) {
+                    val wp = jsonArray.getJSONObject(i)
+                    val wpLat = wp.getDouble("lat")
+                    val wpLng = wp.getDouble("lng")
+                    val wpName = wp.optString("name", "경유지${i + 1}")
+                    val wpKatec = MainApplication.knsdk.convertWGS84ToKATEC(wpLng, wpLat)
+                    viaList.add(KNPOI(wpName, wpKatec.x.toInt(), wpKatec.y.toInt(), wpName))
+                    Log.d(TAG, "경유지 $i: $wpName WGS84($wpLat,$wpLng) \u2192 KATEC(${wpKatec.x.toInt()},${wpKatec.y.toInt()})")
+                }
+                vias = viaList
+                Log.d(TAG, "경유지 ${viaList.size}곳 설정 완료")
+            } catch (e: Exception) {
+                Log.e(TAG, "경유지 파싱 오류: ${e.message}")
+            }
+        }
+
+        Log.d(TAG, "경로 요청: start=($startLng,$startLat) \u2192 dest=$destName($destLng,$destLat), 경유지=${vias?.size ?: 0}곳")
 
         Thread {
             // 출발지: GPS 좌표가 있으면 사용, 없으면 (0,0)=현재위치
@@ -81,7 +123,7 @@ class KNNaviActivity : AppCompatActivity(),
             MainApplication.knsdk.makeTripWithStart(
                 aStart = startPoi,
                 aGoal = goalPoi,
-                aVias = null
+                aVias = vias
             ) { aError, aTrip ->
                 if (aError != null) {
                     Log.e(TAG, "경로 요청 실패: code=${aError.code}, msg=${aError.msg}")

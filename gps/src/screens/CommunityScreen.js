@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -250,7 +252,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#fff',
+    paddingHorizontal: 20, paddingBottom: 14,
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
   headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#000' },
@@ -259,7 +263,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, gap: 6,
   },
   writeBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  listContent: { paddingBottom: 20 },
+  listContent: { paddingBottom: 30 },
   searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, backgroundColor: '#fff', gap: 8 },
   searchTypeBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, gap: 4 },
   searchTypeText: { fontSize: 13, color: '#666', fontWeight: '500' },

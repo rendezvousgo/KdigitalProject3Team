@@ -10,12 +10,11 @@
  */
 
 import { findNearbyParkingLots, searchPlaces, getDirections, formatDistance, formatDuration } from './api';
+import { GPT_API_KEY } from '../config/keys';
 
 // ── GPT API 설정 ──────────────────────────────────────────
-// OpenAI API Key - 환경변수 또는 직접 설정
-const GPT_API_KEY = process.env.OPENAI_API_KEY || 'YOUR_OPENAI_API_KEY';
 
-const MODEL_CLASSIFY = 'gpt-4.1-nano';
+const MODEL_CLASSIFY = 'gpt-4.1-mini';   // nano→mini 업그레이드: JSON 분류 정확도 대폭 향상
 const MODEL_ANSWER   = 'gpt-4.1-mini';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
@@ -52,6 +51,8 @@ const TABLE_SCHEMA_DESCRIPTION = `{
   "region": "string | null",
   "destination": "string | null",
   "departure": "string | null",
+  "waypoints": "[string] (경유지 장소명 배열, 순서대로)",
+  "waypoint_indices": "[number] (이전 결과 번호로 경유지 지정, 1-based)",
   "parking_type": "public | private | any",
   "fee_type": "free | paid | any",
   "max_fee": "number | null  (단위: 원)",
@@ -94,8 +95,9 @@ select_result — 이전 추천 목록에서 선택 (경로 없이 단순 선택
   "1번", "두 번째 거", "그거로 할게", "마지막 거"
   ※ select_index에 번호
 
-nearby_search — 주차장이 아닌 주변 시설 검색
-  "근처 편의점", "주변 화장실", "가까운 주유소"
+nearby_search — 주차장이 아닌 주변 시설/장소 검색
+  "근처 편의점", "주변 화장실", "가까운 주유소", "맛집 추천해줘", "근처 음식점", "주변 카페", "가까운 약국"
+  ※ 맛집, 음식점, 카페, 주유소, 편의점, 약국 등 시설 검색·추천 요청은 반드시 nearby_search로 분류. recommend_parking이 아님!
 
 traffic_info — 교통/도로 상황 문의
   "지금 길 막혀?", "정체 심해?", "빠른 길로 가줘"
@@ -110,7 +112,8 @@ rollback — 이전 상태로 되돌리기
 greeting — 인사/안부
   "안녕", "고마워", "수고해"
 
-general — 위에 해당 안 되는 일반 대화
+general — 위에 해당 안 되는 일반 대화 (날씨, 뉴스, 일반 상식 등)
+  ※ 날씨, 뉴스, 계산, 일반 상식 등 장소/경로와 무관한 질문만 general
 
 ═══ 필드 매핑 규칙 ═══
 
@@ -127,55 +130,64 @@ general — 위에 해당 안 되는 일반 대화
 11. "N번으로","N번째" → select_index
 12. 부정적 반응("싫어","별로","다시") → rollback="O"
 13. 이전에 주차장 목록을 보여줬는데 "거기","그쪽" → 가장 최근 1번 결과 = select_index=1
+14. "○○ 거쳐서 △△ 가줘", "○○ 들렀다 △△" → intent=route_set, waypoints=["○○"], destination="△△"
+15. "○○이랑 △△ 거쳐서 □□" → waypoints=["○○","△△"], destination="□□"
+16. "1번 경유하고 2번 목적지" → intent=route_set, waypoint_indices=[1], select_index=2
+17. "1번이랑 3번 거쳐서 2번으로" → intent=route_set, waypoint_indices=[1,3], select_index=2
+18. "천안시청 경유하고 1번으로" → intent=route_set, waypoints=["천안시청"], select_index=1
+19. "1번 경유하고 천안시청" → intent=route_set, waypoint_indices=[1], destination="천안시청"
+20. 이전 결과 번호를 경유지로 쓰면 waypoint_indices, 장소명이면 waypoints에 넣어라. 둘 다 있을 수 있다.
+21. "맛집","음식점","카페","편의점","주유소","약국","병원","은행","마트" 등 nearby_search 시설 키워드 → keywords 배열에 반드시 넣어라. region이 아닌 keywords에 넣어라.
 
 ※ 이전 대화 맥락이 주어지면 반드시 참고하여 "그쪽","거기","그거" 등 지시어를 해석하라.
 ※ 맥락 없이 모호하면 find_parking으로 분류하라.`;
 
 // ── 답변 프롬프트 ─────────────────────────────────────────
-const ANSWER_SYSTEM_PROMPT = `너는 SafeParking 차량 내비게이션 AI 안내 시스템이다.
-이름은 "SafeParking AI"이고, 운전 중인 사용자에게 음성으로 읽힐 수 있는 간결하고 명확한 안내를 제공한다.
+const ANSWER_SYSTEM_PROMPT = `너는 SafeParking 차량 내비게이션 AI이다.
+주차장 검색, 경로 안내, 주변 시설 검색, 교통 정보를 답한다.
 
-═══ 말투 규칙 ═══
-- 존댓말 사용, 하지만 네비게이션처럼 간결하게
-- "~입니다", "~드리겠습니다", "~하세요" 체
-- 불필요한 수식어, 이모지 사용 금지
-- 한 문장은 최대 30자 이내 권장
-- 핵심 정보를 먼저, 부가 정보는 뒤에
+═══ 핵심 원칙 ═══
+1. 모르면 "죄송합니다. 해당 정보는 제공하기 어렵습니다." 라고 답하라.
+2. 조회 데이터에 없는 정보를 절대 지어내지 마라.
+3. 조회 데이터가 "조건에 맞는 결과를 찾지 못했습니다"이면 솔직히 없다고 답하라. 임의 장소를 만들어내지 마라.
+4. 날씨, 뉴스, 일반 상식 등 장소/경로와 무관한 질문엔 "주차장, 경로 안내, 주변 시설 검색만 도와드릴 수 있습니다."라고 답하라.
+5. 최대한 짧게 답하라. 2~3문장 이내.
 
-═══ 상황별 답변 형식 ═══
+═══ 말투 ═══
+- 존댓말, 간결체 ("~입니다", "~하세요")
+- 이모지, 과잉 친절 표현 금지
 
-[주차장 검색/추천 결과가 있을 때]
-"주변 주차장 N곳을 안내드리겠습니다."
-→ 각 주차장: 이름, 거리, 요금 핵심만
-→ "경로 안내를 원하시면 번호로 말씀해주세요."
+═══ 답변 형식 ═══
 
-[주차장 결과가 없을 때]
-"현재 조건에 맞는 주차장을 찾지 못했습니다. 검색 범위를 넓혀볼까요?"
+[주차장 결과 있을 때]
+"주변 주차장 N곳입니다."
+각 주차장: 이름, 거리, 요금만. 번호로 선택 유도.
 
-[경로 안내 (route_set)]
-"○○까지 경로를 안내합니다. 예상 소요 시간 N분, 거리 N.Nkm입니다."
+[주차장 결과 없을 때]
+"해당 지역에서 주차장을 찾지 못했습니다."
 
-[결과 선택 (select_result)]
-"N번 ○○ 주차장을 선택하셨습니다. 경로 안내를 시작할까요?"
+[경로 안내]
+"○○까지 약 N분, N.Nkm입니다."
 
-[롤백]
-"이전 안내를 취소합니다. 다시 검색하시겠습니까?"
+[주변 시설 검색 결과]
+"주변 음식점/카페/주유소 N곳입니다."
+각 시설: 이름, 거리, 분류만. 번호로 선택 유도.
 
 [인사]
-간단히 응대. "안녕하세요. SafeParking AI입니다. 목적지를 말씀해주세요."
+"안녕하세요. 목적지를 말씀해주세요."
 
-[일반 대화]
-주차·경로·교통 관련 도움을 줄 수 있다고 짧게 안내.
+[주변 시설 결과 있을 때]
+"주변 시설 N곳입니다."
+각 시설: 이름, 거리만. 번호로 선택 유도.
 
-[교통 정보]
-현재는 실시간 교통 데이터 미지원임을 안내하고, 경로 안내는 가능하다고 알려줘.
+[범위 밖 질문]
+"주차장 검색, 경로 안내, 주변 시설 검색만 도와드릴 수 있습니다."
 
-═══ 금지 사항 ═══
-- ChatGPT나 AI 어시스턴트처럼 장황하게 답변하지 마라
-- "제가 도와드릴게요~", "물론이죠!" 같은 과잉 친절 표현 금지
-- 이모지 사용 금지
-- "파킹이" 같은 캐릭터 연기 금지
-- 데이터에 없는 정보를 추측하거나 지어내지 마라`;
+═══ 금지 ═══
+- 장황한 설명, 부연, 추천 이유 나열 금지
+- 데이터에 없는 장소를 추측/생성 금지
+- 장소/경로와 무관한 날씨/뉴스/일반상식 답변 금지
+- "물론이죠!", "도와드릴게요~" 등 과잉 표현 금지`;
 
 // ── 대화 히스토리 (롤백 + 결과 참조 지원) ─────────────────
 let _tableHistory = [];     // 과거 테이블 스택
@@ -202,7 +214,9 @@ export function resetConversation() {
   _lastRouteInfo = null;
 }
 
-// ── OpenAI API 호출 ──────────────────────────────────────
+// ── OpenAI API 호출 (자동 리트라이 포함) ──────────────────
+const MAX_RETRIES = 2;
+
 async function callGPT(model, systemPrompt, userContent, temperature = 0.3) {
   const body = {
     model,
@@ -214,23 +228,68 @@ async function callGPT(model, systemPrompt, userContent, temperature = 0.3) {
     max_tokens: 1024,
   };
 
-  const res = await fetch(OPENAI_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${GPT_API_KEY}`,
-    },
-    body: JSON.stringify(body),
-  });
+  const jsonBody = JSON.stringify(body);
+  console.log(`[callGPT] 요청: model=${model}, body크기=${jsonBody.length}bytes`);
 
-  if (!res.ok) {
-    const errText = await res.text();
-    console.log('GPT API error:', res.status, errText);
-    throw new Error(`GPT API 오류 (${res.status})`);
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const delay = 1000 * attempt;
+      console.log(`[callGPT] 재시도 ${attempt}/${MAX_RETRIES} (${delay}ms 대기)`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+
+    let res;
+    try {
+      res = await fetch(OPENAI_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': `Bearer ${GPT_API_KEY}`,
+          'Accept': 'application/json',
+        },
+        body: jsonBody,
+      });
+    } catch (fetchErr) {
+      console.log(`[callGPT] 네트워크 에러 (시도${attempt}):`, fetchErr.message);
+      lastError = new Error(`GPT API 네트워크 오류: ${fetchErr.message}`);
+      continue; // 리트라이
+    }
+
+    console.log(`[callGPT] 응답: status=${res.status} (시도${attempt})`);
+
+    // 성공
+    if (res.ok) {
+      try {
+        const data = await res.json();
+        const answer = data.choices?.[0]?.message?.content?.trim() ?? '';
+        console.log(`[callGPT] 성공: ${answer.slice(0, 80)}...`);
+        return answer;
+      } catch (parseErr) {
+        console.log('[callGPT] 응답 JSON 파싱 실패:', parseErr.message);
+        lastError = new Error(`GPT API 응답 파싱 오류: ${parseErr.message}`);
+        continue;
+      }
+    }
+
+    // 에러 응답
+    let errText = '';
+    try { errText = await res.text(); } catch (_) {}
+    console.log(`[callGPT] API 에러: ${res.status} ${errText.slice(0, 300)}`);
+
+    // 429(Rate Limit), 500+는 리트라이 가능
+    if (res.status === 429 || res.status >= 500) {
+      lastError = new Error(`GPT API 오류 (${res.status}): ${errText.slice(0, 150)}`);
+      continue; // 리트라이
+    }
+
+    // 400, 401, 403 등은 리트라이해도 안 됨
+    throw new Error(`GPT API 오류 (${res.status}): ${errText.slice(0, 150)}`);
   }
 
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() ?? '';
+  // 모든 리트라이 소진
+  throw lastError || new Error('GPT API 알 수 없는 오류');
 }
 
 // ── 1) 분류: 사용자 발화 → 테이블 JSON ──────────────────
@@ -363,6 +422,32 @@ function validateTable(table) {
     fixed.keywords = [];
   }
 
+  // waypoints — 배열
+  if (!Array.isArray(fixed.waypoints)) {
+    fixed.waypoints = [];
+  }
+  // 빈 문자열 제거
+  fixed.waypoints = fixed.waypoints.filter(w => typeof w === 'string' && w.trim());
+
+  // waypoint_indices — 이전 결과 번호로 경유지 지정
+  if (!Array.isArray(fixed.waypoint_indices)) {
+    fixed.waypoint_indices = [];
+  }
+  fixed.waypoint_indices = fixed.waypoint_indices
+    .map(Number)
+    .filter(n => !isNaN(n) && n >= 1);
+  // 이전 결과 범위 초과 → 마지막으로 보정
+  if (fixed.waypoint_indices.length > 0 && _lastParkingList.length > 0) {
+    fixed.waypoint_indices = fixed.waypoint_indices.map(idx =>
+      idx > _lastParkingList.length ? _lastParkingList.length : idx
+    );
+  }
+  // 이전 결과가 없는데 waypoint_indices가 있으면 → 무시
+  if (fixed.waypoint_indices.length > 0 && _lastParkingList.length === 0) {
+    errors.push('waypoint_indices 있지만 이전 결과 없음 → 무시');
+    fixed.waypoint_indices = [];
+  }
+
   // rollback
   if (fixed.rollback !== 'O' && fixed.rollback !== 'X') {
     fixed.rollback = 'X';
@@ -387,23 +472,28 @@ function validateTable(table) {
     fixed.rollback = 'O';
   }
 
-  // route_set인데 목적지도 select_index도 없으면 → 이전 1번 결과 사용 시도
+  // route_set인데 목적지도 select_index도 없으면 → region 우선, 없으면 재요청
   if (fixed.intent === 'route_set' && !fixed.destination && !fixed.select_index) {
-    if (_lastParkingList.length > 0) {
+    if (fixed.region) {
+      // ★ region을 destination으로 승격 (이전 결과보다 우선)
+      fixed.destination = fixed.region;
+      errors.push('route_set: region을 destination으로 승격');
+    } else if (_lastParkingList.length > 0) {
       fixed.select_index = 1;
       errors.push('route_set에 목적지 없음 → 이전 1번 결과 자동 선택');
-    } else if (fixed.region) {
-      fixed.destination = fixed.region;
     } else {
-      errors.push('route_set에 목적지 정보 없음 → find_parking으로 변경');
-      fixed.intent = 'find_parking';
+      // 목적지 정보 전무 → 재요청
+      fixed.intent = '_clarify';
+      fixed._clarifyReason = 'no_destination';
+      errors.push('route_set에 목적지 정보 없음 → 재요청');
     }
   }
 
-  // select_result인데 이전 결과가 없으면 → find_parking
+  // select_result인데 이전 결과가 없으면 → 재요청
   if (fixed.intent === 'select_result' && _lastParkingList.length === 0) {
-    errors.push('select_result인데 이전 결과 없음 → find_parking으로 변경');
-    fixed.intent = 'find_parking';
+    fixed.intent = '_clarify';
+    fixed._clarifyReason = 'no_previous_results';
+    errors.push('select_result인데 이전 결과 없음 → 재요청');
     fixed.select_index = null;
   }
 
@@ -438,6 +528,8 @@ function getDefaultTable() {
     time_constraint: null,
     select_index: null,
     keywords: [],
+    waypoints: [],
+    waypoint_indices: [],
     rollback: 'X',
   };
 }
@@ -446,6 +538,11 @@ function getDefaultTable() {
 async function fetchParkingData(table, userLat, userLng) {
   const skipIntents = ['rollback', 'cancel', 'general', 'greeting', 'traffic_info'];
   if (skipIntents.includes(table.intent)) {
+    return [];
+  }
+
+  // route_set에서 destination만 있으면 경로만 필요, 주차장 검색 불필요
+  if (table.intent === 'route_set' && !table.select_index) {
     return [];
   }
 
@@ -468,7 +565,9 @@ async function fetchParkingData(table, userLat, userLng) {
 
   // nearby_search → 카카오 장소 검색
   if (table.intent === 'nearby_search') {
-    const kw = table.keywords?.join(' ') || table.region || '편의점';
+    let kw = table.keywords?.join(' ') || table.region || table.destination || '편의점';
+    // ★ 맛집 → 음식점 매핑 (카카오 API 정확도 향상)
+    kw = kw.replace(/맛집/g, '음식점').replace(/밥집/g, '음식점').replace(/식당/g, '음식점');
     try {
       const places = await searchPlaces(kw, userLat, userLng);
       return places.slice(0, table.top_n).map(p => ({
@@ -500,6 +599,10 @@ async function fetchParkingData(table, userLat, userLng) {
       if (places.length > 0) {
         searchLat = places[0].lat;
         searchLng = places[0].lng;
+      } else {
+        // ★ 검색 키워드로 장소를 찾지 못함 → 현 위치 fallback 대신 재요청
+        console.log(`[fetchParkingData] '${searchKeyword}' 장소 검색 실패 → 재요청`);
+        return { _clarify: true, reason: 'location_not_found', keyword: searchKeyword };
       }
     }
 
@@ -511,6 +614,33 @@ async function fetchParkingData(table, userLat, userLng) {
       if (table.parking_type === 'public' && lot.fee && lot.fee.includes('민영')) return false;
       return true;
     });
+
+    // ── 공공데이터 부족 시 카카오 장소 검색으로 보완 ──
+    // 가까운 주차장이 부족하거나(top_n 미만) 가장 가까운 결과도 5km 초과이면
+    const nearEnough = results.filter(r => r.distance <= 5);
+    if (nearEnough.length < table.top_n) {
+      try {
+        const kakaoKeyword = searchKeyword ? `${searchKeyword} 주차장` : '주차장';
+        const kakaoResults = await searchPlaces(kakaoKeyword, searchLat, searchLng);
+        const kakaoParking = kakaoResults
+          .filter(p => p.category?.includes('주차장') || p.name?.includes('주차'))
+          .map(p => ({
+            name: p.name,
+            address: p.address,
+            lat: p.lat,
+            lng: p.lng,
+            distance: p.distance ? p.distance / 1000 : null,
+            capacity: null,
+            fee: null,
+            phone: p.phone || null,
+            source: 'kakao',
+          }));
+        // 공공데이터 결과 뒤에 카카오 결과 합치기 (공공 우선)
+        results = [...results, ...kakaoParking];
+      } catch (kakaoErr) {
+        console.log('카카오 주차장 보완 검색 오류:', kakaoErr);
+      }
+    }
 
     // 키워드 필터 (선택적 부스팅)
     if (table.keywords && table.keywords.length > 0) {
@@ -532,7 +662,26 @@ async function fetchParkingData(table, userLat, userLng) {
     }
     // price 정렬은 요금 파싱이 복잡하므로 distance로 폴백
 
-    results = results.slice(0, table.top_n);
+    // 최종 중복 제거: 이름 또는 좌표 근접(50m 이내) 기준
+    const dedupResults = [];
+    for (const lot of results) {
+      const isDup = dedupResults.some(existing => {
+        // 이름 완전 일치
+        if (existing.name === lot.name) return true;
+        // 좌표 50m 이내 + 이름 유사
+        if (existing.lat && lot.lat) {
+          const dist = Math.sqrt(
+            Math.pow((existing.lat - lot.lat) * 111320, 2) +
+            Math.pow((existing.lng - lot.lng) * 111320 * Math.cos(lot.lat * Math.PI / 180), 2)
+          );
+          if (dist < 50) return true;
+        }
+        return false;
+      });
+      if (!isDup) dedupResults.push(lot);
+      if (dedupResults.length >= table.top_n) break;
+    }
+    results = dedupResults;
   } catch (error) {
     console.log('주차장 데이터 조회 오류:', error);
   }
@@ -569,10 +718,46 @@ async function fetchRouteInfo(table, selectedParking, userLat, userLng) {
 
   try {
     const priorityMap = { fastest: 'RECOMMEND', shortest: 'DISTANCE', free: 'TIME' };
+    const dirOptions = { priority: priorityMap[table.route_pref] || 'RECOMMEND' };
+
+    // ── 경유지 처리 (인덱스 + 장소명 통합) ──
+    let waypointNames = [];
+    const wpCoords = [];
+
+    // 1) waypoint_indices: 이전 결과 번호 → 좌표/이름 변환
+    if (table.waypoint_indices && table.waypoint_indices.length > 0) {
+      for (const idx of table.waypoint_indices) {
+        const item = _lastParkingList[idx - 1];
+        if (item && item.lat && item.lng) {
+          wpCoords.push({ lat: item.lat, lng: item.lng });
+          waypointNames.push(item.name || `${idx}번`);
+        }
+      }
+    }
+
+    // 2) waypoints: 장소명 → 카카오 검색으로 좌표 변환
+    if (table.waypoints && table.waypoints.length > 0) {
+      for (const wpName of table.waypoints) {
+        try {
+          const wpPlaces = await searchPlaces(wpName, userLat, userLng);
+          if (wpPlaces.length > 0) {
+            wpCoords.push({ lat: wpPlaces[0].lat, lng: wpPlaces[0].lng });
+            waypointNames.push(wpPlaces[0].name);
+          }
+        } catch (e) {
+          console.log(`경유지 '${wpName}' 검색 실패:`, e);
+        }
+      }
+    }
+
+    if (wpCoords.length > 0) {
+      dirOptions.waypoints = wpCoords;
+    }
+
     const route = await getDirections(
       { lat: userLat, lng: userLng },
       { lat: destLat, lng: destLng },
-      { priority: priorityMap[table.route_pref] || 'RECOMMEND' },
+      dirOptions,
     );
     return {
       destName,
@@ -581,11 +766,27 @@ async function fetchRouteInfo(table, selectedParking, userLat, userLng) {
       distance: route.distance,     // 미터
       duration: route.duration,     // 초
       fare: route.fare,
+      waypointNames,
+      waypointCoords: wpCoords,
     };
   } catch (err) {
     console.log('경로 조회 실패:', err);
-    return { destName, destLat, destLng, distance: null, duration: null, fare: null, error: true };
+    return { destName, destLat, destLng, distance: null, duration: null, fare: null, error: true, waypointCoords: [] };
   }
+}
+
+// ── 거리 포맷 헬퍼 (km 단위 입력) ──
+function fmtDistKm(d) {
+  if (d == null || isNaN(d)) return '?';
+  if (d < 0.01) return '근처';
+  if (d < 1) return `${Math.round(d * 1000)}m`;
+  return `${d.toFixed(1)}km`;
+}
+// ── 거리 포맷 헬퍼 (m 단위 입력) ──
+function fmtDistM(d) {
+  if (d == null || isNaN(d)) return '?';
+  if (d < 1000) return `${Math.round(d)}m`;
+  return `${(d / 1000).toFixed(1)}km`;
 }
 
 // ── 4) 답변 생성 ────────────────────────────────────────
@@ -597,27 +798,31 @@ async function generateAnswer(table, parkingData, routeInfo, userText) {
       // nearby_search 결과
       dataStr = parkingData
         .map((p, i) =>
-          `${i + 1}. ${p.name} — 거리: ${p.distance != null ? (p.distance < 1 ? `${Math.round(p.distance * 1000)}m` : `${p.distance.toFixed(1)}km`) : '?'}, 주소: ${p.address || '?'}, 분류: ${p.category || '?'}`
+          `${i + 1}. ${p.name} — 거리: ${fmtDistKm(p.distance)}, 주소: ${p.address || '?'}, 분류: ${p.category || '?'}`
         ).join('\n');
     } else {
       dataStr = parkingData
         .map((p, i) =>
-          `${i + 1}. ${p.name} — 거리: ${p.distance != null ? (p.distance < 1 ? `${Math.round(p.distance * 1000)}m` : `${p.distance.toFixed(1)}km`) : '?'}, 주소: ${p.address || '?'}, 주차면: ${p.capacity || '?'}대, 요금: ${p.fee || '정보 없음'}`
+          `${i + 1}. ${p.name} — 거리: ${fmtDistKm(p.distance)}, 주소: ${p.address || '?'}, 주차면: ${p.capacity || '?'}대, 요금: ${p.fee || '정보 없음'}`
         ).join('\n');
     }
   } else {
-    dataStr = '조건에 맞는 결과를 찾지 못했습니다.';
+    dataStr = table.intent === 'route_set'
+      ? '(경로 안내 요청 - 주차장 데이터 불필요)'
+      : '조건에 맞는 결과를 찾지 못했습니다.';
   }
 
-  // 경로 정보 문자열
+  // 경로 정보 문자열 (distance는 미터 단위)
   let routeStr = '';
   if (routeInfo) {
     if (routeInfo.error) {
       routeStr = `\n경로 정보: ${routeInfo.destName}까지 경로 조회에 실패했습니다.`;
     } else if (routeInfo.distance != null) {
-      const distKm = (routeInfo.distance / 1000).toFixed(1);
       const durMin = Math.round(routeInfo.duration / 60);
-      routeStr = `\n경로 정보: ${routeInfo.destName}까지 약 ${distKm}km, 예상 ${durMin}분 소요.`;
+      const wpPart = routeInfo.waypointNames?.length
+        ? ` (경유지: ${routeInfo.waypointNames.join(' → ')})`
+        : '';
+      routeStr = `\n경로 정보: ${routeInfo.destName}까지${wpPart} 약 ${fmtDistM(routeInfo.distance)}, 예상 ${durMin}분 소요.`;
     }
   }
 
@@ -654,6 +859,16 @@ export async function processUserMessage(userText, userLat, userLng, conversatio
   }
   const table = fixed;
 
+  // ②-B 재요청 분기 (validateTable에서 _clarify로 변환된 경우)
+  if (table.intent === '_clarify') {
+    const clarifyMessages = {
+      no_destination: '어디로 안내해드릴까요? 목적지를 말씀해주세요.',
+      no_previous_results: '이전 검색 결과가 없습니다. 먼저 주차장을 검색해주세요.',
+    };
+    const text = clarifyMessages[table._clarifyReason] || '다시 한번 말씀해주세요.';
+    return { text, table, parkingList: [], routeInfo: null, rolledBack: false, needsClarification: true };
+  }
+
   // ③ 롤백 처리
   if (table.rollback === 'O') {
     let rolledBack = false;
@@ -666,14 +881,28 @@ export async function processUserMessage(userText, userLat, userLng, conversatio
     const text = rolledBack
       ? '이전 안내를 취소합니다. 다시 검색하시겠습니까?'
       : '취소할 이전 내역이 없습니다. 목적지를 말씀해주세요.';
-    return { text, table, parkingList: [], routeInfo: null, rolledBack };
+    return { text, table, parkingList: [], routeInfo: null, rolledBack, needsClarification: true };
   }
 
   // ④ 데이터 조회
   const parkingList = await fetchParkingData(table, userLat, userLng);
 
+  // ④-B 데이터 조회에서 재요청이 온 경우 (장소 검색 실패 등)
+  if (parkingList && parkingList._clarify) {
+    const reason = parkingList.reason;
+    const kw = parkingList.keyword || '';
+    let text;
+    if (reason === 'location_not_found') {
+      text = `'${kw}' 지역을 찾지 못했습니다. 다른 지역명이나 더 구체적인 장소를 말씀해주세요.`;
+    } else {
+      text = '검색 조건을 확인할 수 없습니다. 다시 말씀해주세요.';
+    }
+    return { text, table, parkingList: [], routeInfo: null, rolledBack: false, needsClarification: true };
+  }
+
   // ⑤ 경로 조회 (route_set만)
   let routeInfo = null;
+  _lastRouteInfo = null; // ★ 이전 경로 정보 초기화 (잔존값 방지)
   if (table.intent === 'route_set') {
     const selectedParking = parkingList.length === 1 ? parkingList[0] : null;
     routeInfo = await fetchRouteInfo(table, selectedParking, userLat, userLng);

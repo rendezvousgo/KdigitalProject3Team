@@ -23,6 +23,7 @@ import { formatDistance } from '../services/api';
 import { processUserMessage, resetConversation } from '../services/gptParkingService';
 import { emit } from '../services/eventBus';
 import { startNavigation as startKNSDKNavi } from '../services/knsdkBridge';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // 기본 AI 안내
 const INITIAL_MESSAGES = [
@@ -41,7 +42,25 @@ const QUICK_QUESTIONS = [
   '시청 근처 주차장',
 ];
 
+// ── 마스코트 호출어 ──
+const WAKE_WORD = '파키';
+const WAKE_PATTERNS = ['파키야', '파키아', '파키 야', '파키 아', '빠키야', '빠키아', '바키야', '바키아', '파 키야', '팍이야', '파키여'];
+
+// ── 거리 포맷 헬퍼 ──
+function formatDistKm(distKm) {
+  if (distKm == null || isNaN(distKm)) return '거리 정보 없음';
+  if (distKm < 0.01) return '근처';
+  if (distKm < 1) return `${Math.round(distKm * 1000)}m`;
+  return `${distKm.toFixed(1)}km`;
+}
+function formatDistMeters(distM) {
+  if (distM == null || isNaN(distM)) return '거리 정보 없음';
+  if (distM < 1000) return `${Math.round(distM)}m`;
+  return `${(distM / 1000).toFixed(1)}km`;
+}
+
 export default function AIAssistantScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -49,6 +68,8 @@ export default function AIAssistantScreen({ navigation }) {
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [wakeWordMode, setWakeWordMode] = useState(false);
+  const [conversationMode, setConversationMode] = useState(false); // 1분 대화 모드
   const [userLocation, setUserLocation] = useState(null);
   const flatListRef = useRef(null);
   const typingDots = useRef(new Animated.Value(0)).current;
@@ -56,6 +77,12 @@ export default function AIAssistantScreen({ navigation }) {
   const waveAnim = useRef(new Animated.Value(0)).current;
   const recognizedTextRef = useRef('');
   const sendMessageRef = useRef(null);
+  const wakeWordModeRef = useRef(false);
+  const wakeWordRestartTimer = useRef(null);
+  const conversationTimer = useRef(null); // 1분 대화모드 타이머
+  const conversationModeRef = useRef(false);
+  const voiceModalVisibleRef = useRef(false); // ★ STT 이벤트에서 modal 상태 참조용
+  const voiceStartTimeRef = useRef(0); // ★ 음성 시작 시각 (레이스 컨디션 방지)
 
   useEffect(() => {
     if (isTyping) {
@@ -89,7 +116,107 @@ export default function AIAssistantScreen({ navigation }) {
     }
   }, [isListening]);
 
-  // STT 이벤트 처리
+  // ── 호출어 감지 헬퍼 ──
+  const extractWakeWordCommand = (text) => {
+    if (!text) return null;
+    // "파키야", "파키 야", "빠키야", "바키야" 등 호출어 감지 후 뒤의 명령어 추출
+    const match = text.match(/[파빠바]\s*키\s*[야아여]/i);
+    if (match) {
+      const cmd = text.slice(match.index + match[0].length).trim();
+      return cmd || null;
+    }
+    return null;
+  };
+
+  // ── 호출어 모드: 조용히 계속 듣기 ──
+  const startWakeWordListening = async () => {
+    if (!wakeWordModeRef.current) return;
+    try {
+      try { await Voice.cancel(); } catch (_) {}
+      await new Promise(r => setTimeout(r, 150));
+      await Voice.start('ko-KR');
+      console.log('[WakeWord] 대기 중...');
+    } catch (err) {
+      console.log('[WakeWord] 재시작 실패:', err);
+      // 잠시 후 재시도
+      if (wakeWordModeRef.current) {
+        wakeWordRestartTimer.current = setTimeout(() => startWakeWordListening(), 2000);
+      }
+    }
+  };
+
+  const toggleWakeWordMode = async () => {
+    const next = !wakeWordMode;
+    setWakeWordMode(next);
+    wakeWordModeRef.current = next;
+    if (next) {
+      Vibration.vibrate(100);
+      startWakeWordListening();
+    } else {
+      if (wakeWordRestartTimer.current) clearTimeout(wakeWordRestartTimer.current);
+      try { await Voice.cancel(); } catch (_) {}
+      // 대화모드도 같이 끄기
+      stopConversationMode();
+    }
+  };
+
+  // ── 1분 대화 모드: 파키야 없이도 음성 자동 수신 ──
+  const startConversationMode = () => {
+    if (!wakeWordModeRef.current) return; // 호출어 모드가 켜져있을 때만
+    console.log('[ConvMode] 1분 대화 모드 시작');
+    setConversationMode(true);
+    conversationModeRef.current = true;
+    // 이전 타이머 클리어
+    if (conversationTimer.current) clearTimeout(conversationTimer.current);
+    // 60초 후 자동 해제
+    conversationTimer.current = setTimeout(() => {
+      console.log('[ConvMode] 1분 경과 → 대화 모드 종료');
+      stopConversationMode();
+    }, 60000);
+  };
+
+  const stopConversationMode = () => {
+    setConversationMode(false);
+    conversationModeRef.current = false;
+    if (conversationTimer.current) {
+      clearTimeout(conversationTimer.current);
+      conversationTimer.current = null;
+    }
+  };
+
+  // 대화모드에서 호출어없이 직접 청취 시작
+  const startConversationListening = async () => {
+    if (!conversationModeRef.current || !wakeWordModeRef.current) return;
+    try {
+      try { await Voice.cancel(); } catch (_) {}
+      await new Promise(r => setTimeout(r, 150));
+      await Voice.start('ko-KR');
+      console.log('[ConvMode] 대화 청취 중...');
+    } catch (err) {
+      console.log('[ConvMode] 청취 시작 실패:', err);
+      if (conversationModeRef.current) {
+        wakeWordRestartTimer.current = setTimeout(() => startConversationListening(), 2000);
+      }
+    }
+  };
+
+  // 화면 떠날 때 호출어 모드 정리
+  useEffect(() => {
+    return () => {
+      wakeWordModeRef.current = false;
+      conversationModeRef.current = false;
+      if (wakeWordRestartTimer.current) clearTimeout(wakeWordRestartTimer.current);
+      if (conversationTimer.current) clearTimeout(conversationTimer.current);
+      Voice.destroy().catch(() => {});
+    };
+  }, []);
+
+  // ★ voiceModalVisible ref 동기화
+  useEffect(() => {
+    voiceModalVisibleRef.current = voiceModalVisible;
+  }, [voiceModalVisible]);
+
+  // STT 이벤트 처리 (★ 의존성 [] — 한 번만 등록, ref로 상태 참조)
   useEffect(() => {
     Voice.onSpeechStart = () => {
       console.log('STT: onSpeechStart');
@@ -98,19 +225,52 @@ export default function AIAssistantScreen({ navigation }) {
     Voice.onSpeechResults = (event) => {
       const text = event?.value?.[0] ?? '';
       console.log('STT: onSpeechResults -', text);
+
+      // ── 대화 모드: 호출어 없이도 직접 전송 ──
+      if (conversationModeRef.current && wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        if (text && text.trim()) {
+          console.log('[ConvMode] 대화 모드 입력:', text);
+          Vibration.vibrate([0, 100, 50, 100]);
+          const cmd = extractWakeWordCommand(text);
+          const finalText = cmd || text;
+          setInputText(finalText);
+          sendMessageRef.current?.(finalText);
+          startConversationMode();
+        } else {
+          wakeWordRestartTimer.current = setTimeout(() => startConversationListening(), 500);
+        }
+        return;
+      }
+
+      // ── 호출어 모드: 호출어 감지 시 명령 처리 ──
+      if (wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        const cmd = extractWakeWordCommand(text);
+        if (cmd) {
+          console.log('[WakeWord] 명령 감지:', cmd);
+          Vibration.vibrate([0, 100, 50, 100]);
+          setInputText(cmd);
+          sendMessageRef.current?.(cmd);
+        } else {
+          console.log('[WakeWord] 호출어 없음, 재시작');
+        }
+        wakeWordRestartTimer.current = setTimeout(() => startWakeWordListening(), 500);
+        return;
+      }
+
+      // ── 일반 STT 모드 ──
       recognizedTextRef.current = text;
       setInputText(text);
-
-      // 최종 결과가 왔으면 모달 닫고 메시지 전송
       setIsListening(false);
       setVoiceModalVisible(false);
       if (text && text.trim()) {
-        sendMessageRef.current?.(text);
+        const cmd = extractWakeWordCommand(text);
+        sendMessageRef.current?.(cmd || text);
       }
     };
 
     Voice.onSpeechPartialResults = (event) => {
       const text = event?.value?.[0] ?? '';
+      if (wakeWordModeRef.current && !voiceModalVisibleRef.current) return;
       console.log('STT: partial -', text);
       if (text) {
         recognizedTextRef.current = text;
@@ -119,19 +279,55 @@ export default function AIAssistantScreen({ navigation }) {
     };
 
     Voice.onSpeechEnd = () => {
-      // Android에서는 onSpeechEnd가 onSpeechResults보다 먼저 올 수 있음
-      // 모달 닫기는 onSpeechResults에서 처리하므로 여기서는 listening만 끔
       console.log('STT: onSpeechEnd');
+      if (conversationModeRef.current && wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        return;
+      }
+      if (wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        return;
+      }
+      // ★ 모달이 열린 직후 바로 end가 날아오는 경우 무시 (800ms 이내)
+      if (voiceModalVisibleRef.current && Date.now() - voiceStartTimeRef.current < 800) {
+        console.log('STT: onSpeechEnd 무시 (너무 빠른 종료)');
+        // 재시작 시도
+        setTimeout(async () => {
+          try { await Voice.start('ko-KR'); } catch(_) {}
+        }, 300);
+        return;
+      }
       setIsListening(false);
+      // ★ Voice.destroy() 제거 — cancel만 수행 (2회차 STT 오류 방지)
+      Voice.cancel().catch(() => {});
     };
 
     Voice.onSpeechError = (e) => {
       console.log('STT: onSpeechError', JSON.stringify(e));
+      const code = e?.error?.code ?? e?.error ?? '';
+
+      if (conversationModeRef.current && wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        wakeWordRestartTimer.current = setTimeout(() => startConversationListening(), 1000);
+        return;
+      }
+
+      if (wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        wakeWordRestartTimer.current = setTimeout(() => startWakeWordListening(), 1000);
+        return;
+      }
+
+      // ★ 모달이 열린 직후 에러가 날아오는 경우 다시 시도 (800ms 이내)
+      if (voiceModalVisibleRef.current && Date.now() - voiceStartTimeRef.current < 800) {
+        console.log('STT: onSpeechError 무시 (너무 빠른 에러), 재시도');
+        setTimeout(async () => {
+          try { await Voice.start('ko-KR'); } catch(_) {}
+        }, 300);
+        return;
+      }
+
       setIsListening(false);
       setVoiceModalVisible(false);
-      // 에러 코드 7 = NO_MATCH (말을 못 알아들음) → Alert 안 띄움
-      const code = e?.error?.code ?? e?.error ?? '';
-      if (String(code) !== '7') {
+      // ★ 무해한 에러 코드 무시 (7=no match, 6=speech timeout, 2=network, 5=client, 11=not recognized)
+      const ignoreCodes = ['2', '5', '6', '7', '11', '12', '13'];
+      if (!ignoreCodes.includes(String(code))) {
         Alert.alert('음성 인식 오류', `음성 인식 중 오류가 발생했습니다. (코드: ${code})`);
       }
     };
@@ -139,7 +335,7 @@ export default function AIAssistantScreen({ navigation }) {
     return () => {
       Voice.removeAllListeners();
     };
-  }, []);
+  }, []); // ★ 의존성 제거 — 리스너 한 번만 등록
 
   // TTS로 응답 읽기
   const speakResponse = async (text) => {
@@ -168,7 +364,6 @@ export default function AIAssistantScreen({ navigation }) {
 
   const startVoiceInputReal = async () => {
     try {
-      // Voice 모듈 사용 가능 여부 먼저 확인
       const available = await Voice.isAvailable();
       if (!available) {
         Alert.alert('음성 인식 불가', '이 기기에서 음성 인식을 사용할 수 없습니다.\n설정 > Google > 음성 인식에서 확인해주세요.');
@@ -176,11 +371,21 @@ export default function AIAssistantScreen({ navigation }) {
       }
     } catch (checkErr) {
       console.log('STT: isAvailable 체크 실패:', checkErr);
-      // 체크 실패해도 일단 시도
     }
+
+    // ★ 이전 세션 정리 (두 번째 클릭 오류 방지)
+    try {
+      await Voice.stop();
+    } catch (_) {}
+    try {
+      await Voice.cancel();
+    } catch (_) {}
+    // ★ Voice.destroy() 제거 — destroy하면 네이티브 인식기가 파괴되어 2회차 실패
+    await new Promise(r => setTimeout(r, 200));
 
     setVoiceModalVisible(true);
     setIsListening(true);
+    voiceStartTimeRef.current = Date.now(); // ★ 시작 시각 기록 (레이스 컨디션 방지)
     Vibration.vibrate(50);
 
     recognizedTextRef.current = '';
@@ -196,7 +401,6 @@ export default function AIAssistantScreen({ navigation }) {
 
       const msg = error?.message || String(error);
       if (msg.includes('startSpeech') || msg.includes('null')) {
-        // 네이티브 모듈 초기화 문제 → 앱 재시작 안내
         Alert.alert('음성 인식 오류', '음성 인식 모듈을 초기화할 수 없습니다.\n앱을 완전히 종료 후 다시 시작해주세요.');
       } else if (msg.includes('permission') || msg.includes('Permission')) {
         Alert.alert('권한 필요', '마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
@@ -216,6 +420,11 @@ export default function AIAssistantScreen({ navigation }) {
       await Voice.cancel();
     } catch (error) {
       // noop
+    }
+
+    // 호출어 모드가 켜져있으면 다시 대기 시작
+    if (wakeWordModeRef.current) {
+      wakeWordRestartTimer.current = setTimeout(() => startWakeWordListening(), 500);
     }
   };
 
@@ -243,6 +452,10 @@ export default function AIAssistantScreen({ navigation }) {
   const sendMessage = async (text) => {
     if (!text.trim()) return;
 
+    // ★ 호출어 접두사 제거 (텍스트 입력에서도 "파키야" 처리)
+    const wakeCmd = extractWakeWordCommand(text);
+    const cleanText = wakeCmd || text;
+
     const userMessage = {
       id: Date.now(),
       type: 'user',
@@ -260,19 +473,18 @@ export default function AIAssistantScreen({ navigation }) {
 
       // GPT 파이프라인: 분류(Nano) → 검증 → 데이터 조회 → 답변(Mini)
       const result = await processUserMessage(
-        text,
+        cleanText,
         coords.latitude,
         coords.longitude,
         ctx,
       );
 
-      // 주차장 추천 카드 빌드
-      const recommendations = result.parkingList?.length > 0
+      // 주차장 추천 카드 빌드 (route_set은 경로 카드만 표시, 주차장 카드 생략)
+      const skipRecommendations = result.action === 'navigateToMap' || result.table?.intent === 'route_set';
+      const recommendations = (!skipRecommendations && result.parkingList?.length > 0)
         ? result.parkingList.filter(p => p.type !== 'place').map(p => ({
             name: p.name || '주차장',
-            distance: p.distance != null
-              ? (p.distance < 1 ? `${Math.round(p.distance * 1000)}m` : `${p.distance.toFixed(1)}km`)
-              : '거리 정보 없음',
+            distance: formatDistKm(p.distance),
             available: p.capacity || null,
             price: p.fee || null,
             safe: true,
@@ -296,6 +508,20 @@ export default function AIAssistantScreen({ navigation }) {
       setIsTyping(false);
       setMessages(prev => [...prev, aiResponse]);
 
+      // ★ 재요청/롤백 응답 → 대화 모드 시작 (파키야 없이 1분 청취)
+      if (result.needsClarification) {
+        if (voiceEnabled) {
+          speakResponse(aiResponse.text);
+        }
+        // 호출어 모드가 켜져있으면 대화 모드 시작
+        if (wakeWordModeRef.current) {
+          startConversationMode();
+          // TTS 끝난 후 청취 시작 (1.5초 여유)
+          setTimeout(() => startConversationListening(), 1500);
+        }
+        return;
+      }
+
       // route_set → 3D 네비게이션 바로 시작 (KNSDK)
       if (result.action === 'navigateToMap' && result.routeInfo) {
         const ri = result.routeInfo;
@@ -303,14 +529,21 @@ export default function AIAssistantScreen({ navigation }) {
         if (voiceEnabled) {
           speakResponse(aiResponse.text);
         }
+        // 경유지 좌표 수집
+        const waypoints = (ri.waypointCoords || []).map((wp, i) => ({
+          lat: wp.lat,
+          lng: wp.lng,
+          name: ri.waypointNames?.[i] || `경유지${i + 1}`,
+        }));
         // 내비 3D 시작
         setTimeout(async () => {
           try {
             await startKNSDKNavi(
               ri.destLat, ri.destLng, ri.destName || '목적지',
               coords.latitude, coords.longitude,
+              waypoints,
             );
-            console.log('AI → KNSDK 3D 네비 시작');
+            console.log('AI → KNSDK 3D 네비 시작', waypoints.length > 0 ? `(경유지 ${waypoints.length}곳)` : '');
           } catch (navErr) {
             console.log('KNSDK 시작 실패, 지도로 폴백:', navErr);
             emit('navigateToDestination', { name: ri.destName, lat: ri.destLat, lng: ri.destLng });
@@ -323,15 +556,31 @@ export default function AIAssistantScreen({ navigation }) {
       if (voiceEnabled) {
         speakResponse(aiResponse.text);
       }
+
+      // ★ 일반 응답이어도 호출어 모드 + 대화 모드면 계속 청취
+      if (conversationModeRef.current && wakeWordModeRef.current) {
+        // TTS 끝난 후 재청취
+        setTimeout(() => startConversationListening(), 1500);
+      }
     } catch (error) {
-      console.log('GPT pipeline error:', error);
+      console.log('GPT pipeline error:', error?.message, error);
       setIsTyping(false);
+
+      let displayText;
+      if (error.message?.includes('GPT API')) {
+        // 상세 에러 내용 표시 (디버깅용)
+        const detail = error.message.replace('GPT API ', '');
+        displayText = `AI 서비스 연결 오류가 발생했습니다.\n(${detail})\n잠시 후 다시 시도해주세요.`;
+      } else if (error.message?.includes('위치')) {
+        displayText = error.message;
+      } else {
+        displayText = error.message || '요청을 처리하지 못했습니다.';
+      }
+
       const errorMessage = {
         id: Date.now() + 1,
         type: 'ai',
-        text: error.message?.includes('GPT API')
-          ? '서비스 연결에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.'
-          : (error.message || '요청을 처리하지 못했습니다.'),
+        text: displayText,
         time: '방금',
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -369,10 +618,16 @@ export default function AIAssistantScreen({ navigation }) {
                 <MaterialIcons name="directions-car" size={18} color="#007AFF" />
                 <Text style={styles.routeInfoTitle}>{item.routeInfo.destName} 경로</Text>
               </View>
+              {item.routeInfo.waypointNames?.length > 0 && (
+                <View style={styles.routeInfoItem}>
+                  <Ionicons name="flag-outline" size={14} color="#FF9500" />
+                  <Text style={styles.routeInfoText}>경유: {item.routeInfo.waypointNames.join(' → ')}</Text>
+                </View>
+              )}
               <View style={styles.routeInfoDetails}>
                 <View style={styles.routeInfoItem}>
                   <Ionicons name="speedometer-outline" size={14} color="#666" />
-                  <Text style={styles.routeInfoText}>{(item.routeInfo.distance / 1000).toFixed(1)}km</Text>
+                  <Text style={styles.routeInfoText}>{formatDistMeters(item.routeInfo.distance)}</Text>
                 </View>
                 <View style={styles.routeInfoItem}>
                   <Ionicons name="time-outline" size={14} color="#666" />
@@ -449,16 +704,39 @@ export default function AIAssistantScreen({ navigation }) {
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={styles.title}>SafeParking AI</Text>
-          <View style={styles.statusBadge}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>온라인</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.statusBadge}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>온라인</Text>
+            </View>
+            {wakeWordMode && (
+              <View style={[styles.statusBadge, { backgroundColor: conversationMode ? '#E8F5E9' : '#FFF3E0', marginLeft: 6 }]}>
+                <MaterialIcons name="record-voice-over" size={10} color={conversationMode ? '#4CAF50' : '#FF9500'} />
+                <Text style={[styles.statusText, { color: conversationMode ? '#4CAF50' : '#FF9500' }]}>
+                  {conversationMode ? '대화 중' : '"파키야" 대기'}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
-        <TouchableOpacity style={styles.headerButton}>
-          <Ionicons name="ellipsis-vertical" size={24} color="#000" />
+        <TouchableOpacity 
+          style={[styles.headerButton, wakeWordMode && styles.wakeWordHeaderBtnActive]}
+          onPress={toggleWakeWordMode}
+          onLongPress={() => Alert.alert('호출어 안내', '"파키야"라고 부르면 자동으로 음성 인식이 시작됩니다.\n\n예시: "파키야 근처 공영주차장 찾아줘"')}
+        >
+          <MaterialIcons 
+            name="record-voice-over" 
+            size={22} 
+            color={wakeWordMode ? "#FF9500" : "#666"} 
+          />
         </TouchableOpacity>
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
       {/* 메시지 리스트 */}
       <FlatList
         ref={flatListRef}
@@ -500,9 +778,6 @@ export default function AIAssistantScreen({ navigation }) {
       )}
 
       {/* 입력창 */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
         <View style={styles.inputContainer}>
           {/* 음성/TTS 토글 */}
           <TouchableOpacity 
@@ -653,8 +928,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     // paddingVertical: 12,
-    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 10,
-    paddingBottom: 12, // 기존 vertical padding을 아래쪽으로 집중
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 16,
+    paddingBottom: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -690,9 +965,15 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 4,
   },
+  wakeWordHeaderBtnActive: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#FF9500',
+  },
   messagesList: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 16,
   },
   userMessageContainer: {
     alignItems: 'flex-end',
@@ -890,10 +1171,12 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 10,
+    paddingTop: 6,
+    paddingBottom: 6,
     backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e0e0e0',
   },
   voiceToggle: {
     width: 40,
@@ -907,35 +1190,40 @@ const styles = StyleSheet.create({
   voiceToggleActive: {
     backgroundColor: '#E8F8EE',
   },
+  wakeWordActive: {
+    backgroundColor: '#FFF3E0',
+    borderWidth: 1.5,
+    borderColor: '#FF9500',
+  },
   inputWrapper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-end',
     backgroundColor: '#F5F5F5',
-    borderRadius: 24,
-    paddingLeft: 16,
+    borderRadius: 22,
+    paddingLeft: 14,
     paddingRight: 4,
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     maxHeight: 100,
-    paddingVertical: 10,
+    paddingVertical: 8,
     color: '#000',
   },
   micButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 2,
+  },
+  sendButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 4,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     backgroundColor: '#E0E0E0',
     justifyContent: 'center',
     alignItems: 'center',

@@ -128,19 +128,43 @@ export async function getParkingLots(region = null, subRegion = null) {
  */
 export async function findNearbyParkingLots(lat, lng, radiusKm = 30) {
   try {
-    // 서울 데이터만 가져오기 (전체는 너무 많음)
     const region1 = await getRegion1DepthName(lng, lat);
     cachedRegion1 = region1 || cachedRegion1;
-    const allLots = await getParkingLots(region1 || '서울특별시');
+    let allLots = await getParkingLots(region1 || '서울특별시');
+
+    // 해당 지역 주차장이 너무 적으면 인접 지역도 검색
+    if (allLots.length < 20) {
+      const adjacentRegions = getAdjacentRegions(region1);
+      for (const adjRegion of adjacentRegions) {
+        try {
+          const adjLots = await getParkingLots(adjRegion);
+          const existingIds = new Set(allLots.map(l => l.id));
+          for (const lot of adjLots) {
+            if (!existingIds.has(lot.id)) allLots.push(lot);
+          }
+        } catch (_) {}
+      }
+    }
     
-    return allLots
+    const withDist = allLots
       .map(lot => {
         const distance = calculateDistance(lat, lng, lot.lat, lot.lng);
         return { ...lot, distance };
       })
       .filter(lot => lot.distance <= radiusKm)
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, 100); // 최대 20개
+      .sort((a, b) => a.distance - b.distance);
+
+    // 중복 제거: 이름+좌표(소수점3자리) 기준
+    const seen = new Set();
+    const deduped = [];
+    for (const lot of withDist) {
+      const key = `${lot.name}|${lot.lat?.toFixed(3)}|${lot.lng?.toFixed(3)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(lot);
+    }
+
+    return deduped.slice(0, 100);
   } catch (error) {
     console.error('주변 주차장 검색 오류:', error);
     return [];
@@ -184,7 +208,14 @@ export async function searchPlaces(keyword, lat, lng) {
       phone: doc.phone || '',
       distance: doc.distance ? parseInt(doc.distance) : null,
       type: 'place',
-    }));
+    })).sort((a, b) => {
+      // ★ 키워드와 정확히 일치하는 이름을 최우선 (예: "천안시청" → "천안시청사" > "천안시티FC")
+      const kwLower = keyword.toLowerCase();
+      const aExact = a.name.toLowerCase().includes(kwLower) ? 1 : 0;
+      const bExact = b.name.toLowerCase().includes(kwLower) ? 1 : 0;
+      if (aExact !== bExact) return bExact - aExact;
+      return 0; // 같으면 기존 순서(거리순) 유지
+    });
   } catch (error) {
     console.error('장소 검색 오류:', error);
     return [];
@@ -210,6 +241,33 @@ export async function searchParkingByName(keyword) {
     console.error('주차장 검색 오류:', error);
     return [];
   }
+}
+
+/**
+ * 인접 지역 매핑 (공공데이터 API 지역구분 기준)
+ * 해당 지역에 주차장 데이터가 부족할 때 인접 지역도 함께 검색
+ */
+function getAdjacentRegions(region) {
+  const map = {
+    '서울특별시': ['경기도', '인천광역시'],
+    '경기도': ['서울특별시', '인천광역시', '충청남도', '충청북도', '강원도'],
+    '인천광역시': ['서울특별시', '경기도'],
+    '부산광역시': ['경상남도', '울산광역시'],
+    '대구광역시': ['경상북도', '경상남도'],
+    '대전광역시': ['충청남도', '충청북도', '세종시'],
+    '광주광역시': ['전라남도', '전라북도'],
+    '울산광역시': ['부산광역시', '경상남도', '경상북도'],
+    '세종시': ['대전광역시', '충청남도', '충청북도'],
+    '충청남도': ['대전광역시', '세종시', '충청북도', '경기도', '전라북도'],
+    '충청북도': ['대전광역시', '세종시', '충청남도', '경기도', '경상북도', '강원도'],
+    '전라남도': ['광주광역시', '전라북도', '경상남도'],
+    '전라북도': ['광주광역시', '전라남도', '충청남도', '경상남도'],
+    '경상남도': ['부산광역시', '울산광역시', '대구광역시', '전라남도', '전라북도'],
+    '경상북도': ['대구광역시', '울산광역시', '충청북도', '강원도'],
+    '강원도': ['경기도', '충청북도', '경상북도'],
+    '제주시': [],
+  };
+  return map[region] || [];
 }
 
 /**

@@ -191,6 +191,8 @@ const KakaoMapNative = forwardRef(function KakaoMapNative(
   const [ready, setReady] = useState(false);
   const parkingsRef = useRef(parkings);
   parkingsRef.current = parkings;
+  // ★ 초기 center를 고정하여 WebView 소스 변경에 의한 리로드 방지
+  const initialCenter = useRef(center);
 
   useImperativeHandle(ref, () => ({
     panTo: (lat, lng) => {
@@ -260,12 +262,12 @@ const KakaoMapNative = forwardRef(function KakaoMapNative(
       // ignore
     }
   };
-  // source - 앱 켜지는 순간 부모 컴포넌트에서 넘겨준 center값에따라 결정 -> 호출하는곳 찾기
+  // source - 초기 center로 고정 (이후 center 변경은 panTo로 처리)
   return (
     <View style={styles.container}>
       <WebView
         ref={webViewRef}
-        source={{ html: generateHTML(center.latitude, center.longitude) }}
+        source={{ html: generateHTML(initialCenter.current.latitude, initialCenter.current.longitude) }}
         style={styles.webview}
         javaScriptEnabled={true}
         domStorageEnabled={true}

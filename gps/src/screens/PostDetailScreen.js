@@ -11,15 +11,18 @@ import {
   Platform,
   TextInput,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchPostDetail, deletePost, fetchComments, addComment, deleteComment } from '../services/communityApi';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function PostDetailScreen({ route, navigation }) {
   const { postId } = route.params;
   const { user, isLoggedIn, isAdmin } = useAuth();
+  const insets = useSafeAreaInsets();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(false);
   const [comments, setComments] = useState([]);
@@ -154,8 +157,11 @@ export default function PostDetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
-        <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+        <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        >
           {/* 글 내용 */}
           <View style={styles.postCard}>
             <View style={styles.categoryBadge}>
@@ -216,7 +222,7 @@ export default function PostDetailScreen({ route, navigation }) {
         </ScrollView>
 
         {/* 댓글 입력 */}
-        <View style={styles.commentInputBar}>
+        <View style={[styles.commentInputBar, { paddingBottom: Math.max(insets.bottom, 12) + 10 }]}>
           {isLoggedIn ? (
             <>
               <TextInput
@@ -251,7 +257,9 @@ const styles = StyleSheet.create({
   loadingText: { color: '#999', fontSize: 15, marginTop: 10 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+    paddingHorizontal: 16, paddingBottom: 12,
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 16,
+    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
   backBtn: { padding: 4 },
   headerTitle: { fontSize: 17, fontWeight: '600', color: '#000', flex: 1, textAlign: 'center' },
@@ -288,7 +296,7 @@ const styles = StyleSheet.create({
 
   /* Comment input */
   commentInputBar: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 10,
     borderTopWidth: 1, borderTopColor: '#f0f0f0', gap: 10,
   },
   commentInput: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: '#000', maxHeight: 80 },

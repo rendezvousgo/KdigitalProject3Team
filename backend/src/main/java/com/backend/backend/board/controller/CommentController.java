@@ -39,8 +39,8 @@ public class CommentController {
         return commentRepository.save(comment);
     }
 
-    @DeleteMapping("/comments/{commentId}")
-    public String deleteComment(@PathVariable Long commentId, HttpSession session) {
+    @DeleteMapping("/{boardId}/comments/{commentId}")
+    public String deleteComment(@PathVariable Long boardId, @PathVariable Long commentId, HttpSession session) {
         String username = requireLogin(session);
         boolean isAdmin = isAdmin(session);
 

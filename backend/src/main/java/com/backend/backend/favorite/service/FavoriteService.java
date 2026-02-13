@@ -5,6 +5,7 @@ import com.backend.backend.favorite.entity.Favorite;
 import com.backend.backend.favorite.repository.FavoriteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -38,6 +39,7 @@ public class FavoriteService {
         return favoriteRepository.save(favorite);
     }
 
+    @Transactional
     public void removeFavorite(String username, String parkingName) {
         if (StringUtils.hasText(username) && StringUtils.hasText(parkingName)) {
             favoriteRepository.deleteByUsernameAndParkingName(username, parkingName);

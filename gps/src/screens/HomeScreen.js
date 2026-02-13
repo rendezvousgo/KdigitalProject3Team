@@ -12,6 +12,7 @@ import {
   StatusBar,
   Modal,
   FlatList,
+  Vibration,
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { findNearbyParkingLots, formatDistance, formatDuration, favorite, favoriteSave, favoriteList, favoriteRemove } from '../services/api';
@@ -19,6 +20,7 @@ import { openKakaoNavi, fetchRoutePath } from '../services/navigation';
 import { initKNSDK, startNavigation as startKNSDKNavi, getKNSDKStatus, getKeyHash } from '../services/knsdkBridge';
 import { on } from '../services/eventBus';
 import { useAuth } from '../contexts/AuthContext';
+import { createNoParkingZoneMonitor } from '../services/noParkingZoneService';
 
 // 플랫폼별 분기
 import KakaoMapWeb from '../components/KakaoMapWeb';
@@ -53,6 +55,14 @@ export default function HomeScreen({ navigation, route }) {
   const [knsdkStatus, setKnsdkStatus] = useState('초기화 대기');
   const [knsdkReady, setKnsdkReady] = useState(false);
   const [keyHashInfo, setKeyHashInfo] = useState(null);
+
+  // 주정차 금지구역 경고
+  const [dangerVisible, setDangerVisible] = useState(false);
+  const [dangerZone, setDangerZone] = useState(null);
+  const [dangerSeconds, setDangerSeconds] = useState(0);
+  const noParkingMonitorRef = useRef(null);
+  const locationWatcherRef = useRef(null);
+  const dangerAnim = useRef(new Animated.Value(0)).current;
 
   const getParkingKey = (parking) =>
     String(parking?.name || parking?.parkingName || parking?.id || `${parking?.lat || ''}_${parking?.lng || ''}`);
@@ -267,15 +277,19 @@ export default function HomeScreen({ navigation, route }) {
     const dest = route?.params?.destination;
     const ts = route?.params?.timestamp;
     if (dest && dest.lat && dest.lng) {
-      console.log('목적지 수신:', dest.name, dest.lat, dest.lng);
+      console.log('목적지 수신 (params):', dest.name, dest.lat, dest.lng);
       const newCenter = { latitude: dest.lat, longitude: dest.lng };
       setMapCenter(newCenter);
-      // 약간 딜레이를 줘서 WebView가 준비된 후 panTo
-      setTimeout(() => {
+      // 딜레이를 줘서 탭 전환 + WebView가 준비된 후 이동 (여러번 반복하여 확실히 이동)
+      const moveToDestination = () => {
         if (kakaoMapRef.current) {
+          kakaoMapRef.current.setCenter(dest.lat, dest.lng);
           kakaoMapRef.current.panTo(dest.lat, dest.lng);
         }
-      }, 500);
+      };
+      setTimeout(moveToDestination, 300);
+      setTimeout(moveToDestination, 800);
+      setTimeout(moveToDestination, 1500);
     }
   }, [route?.params?.timestamp]);
 
@@ -288,13 +302,85 @@ export default function HomeScreen({ navigation, route }) {
         setMapCenter(newCenter);
         setTimeout(() => {
           if (kakaoMapRef.current) {
+            kakaoMapRef.current.setCenter(dest.lat, dest.lng);
+          }
+        }, 500);
+        setTimeout(() => {
+          if (kakaoMapRef.current) {
             kakaoMapRef.current.panTo(dest.lat, dest.lng);
           }
-        }, 600);
+        }, 1000);
       }
     });
     return unsubscribe;
   }, []);
+
+  // ─── 주정차 금지구역 모니터링 (위치 워치 + 3분 경고) ───
+  useEffect(() => {
+    if (!location || Platform.OS === 'web') return;
+
+    // 모니터 생성
+    const monitor = createNoParkingZoneMonitor(
+      // onWarning: 3분 이상 체류
+      (zone, staySeconds) => {
+        setDangerZone(zone);
+        setDangerSeconds(staySeconds);
+        setDangerVisible(true);
+        Animated.spring(dangerAnim, { toValue: 1, useNativeDriver: true }).start();
+        // 진동 알림
+        try { Vibration.vibrate([0, 500, 200, 500]); } catch (e) {}
+      },
+      // onClear: 금지구역 이탈
+      () => {
+        Animated.timing(dangerAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
+          setDangerVisible(false);
+          setDangerZone(null);
+          setDangerSeconds(0);
+        });
+      }
+    );
+    noParkingMonitorRef.current = monitor;
+
+    // 최초 체크
+    monitor.checkLocation(location.latitude, location.longitude);
+
+    // 위치 워치 시작 (15초 간격)
+    let watchSub = null;
+    (async () => {
+      try {
+        const Location = require('expo-location');
+        watchSub = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 15000,
+            distanceInterval: 10,
+          },
+          (loc) => {
+            if (monitor) {
+              monitor.checkLocation(loc.coords.latitude, loc.coords.longitude);
+            }
+          }
+        );
+        locationWatcherRef.current = watchSub;
+      } catch (e) {
+        console.warn('[NoParkingZone] 위치 워치 실패:', e.message);
+      }
+    })();
+
+    return () => {
+      if (watchSub && watchSub.remove) watchSub.remove();
+      if (locationWatcherRef.current && locationWatcherRef.current.remove) {
+        locationWatcherRef.current.remove();
+      }
+      monitor.destroy();
+    };
+  }, [location]);
+
+  const dismissDangerAlert = () => {
+    Animated.timing(dangerAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
+      setDangerVisible(false);
+    });
+  };
 
   // 위치 변경 시 주변 주차장 로드
   useEffect(() => {
@@ -554,6 +640,45 @@ const goToMyLocation = async () => {
               <Text style={styles.quickActionText}>AI 추천</Text>
             </TouchableOpacity>
           </View> */}
+
+          {/* 주정차 금지구역 경고 알림 */}
+          {dangerVisible && dangerZone && (
+            <Animated.View
+              style={[
+                styles.dangerAlert,
+                {
+                  opacity: dangerAnim,
+                  transform: [{
+                    translateY: dangerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-30, 0],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              <View style={styles.dangerAlertContent}>
+                <View style={styles.dangerIconContainer}>
+                  <MaterialIcons name="warning" size={22} color="#fff" />
+                </View>
+                <View style={styles.dangerAlertText}>
+                  <Text style={styles.dangerTitle}>⚠️ 주정차 금지구역</Text>
+                  <Text style={styles.dangerSubtitle}>
+                    {dangerZone.name} ({Math.floor(dangerSeconds / 60)}분 {dangerSeconds % 60}초 체류)
+                  </Text>
+                  <Text style={[styles.dangerSubtitle, { fontSize: 11, marginTop: 2 }]}>
+                    {dangerZone.address}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.alternativeButton} onPress={dismissDangerAlert}>
+                  <Text style={styles.alternativeButtonText}>확인</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.dangerProgressBar}>
+                <View style={[styles.dangerProgressFill, { width: `${Math.min((dangerSeconds / 180) * 100, 100)}%` }]} />
+              </View>
+            </Animated.View>
+          )}
         </>
       )}
 
@@ -882,6 +1007,14 @@ const styles = StyleSheet.create({
     color: '#1A1A2E',
     fontWeight: '600',
     fontSize: 13,
+  },
+  dangerProgressBar: {
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  dangerProgressFill: {
+    height: 3,
+    backgroundColor: '#E74C3C',
   },
   swipeHint: {
     alignItems: 'center',

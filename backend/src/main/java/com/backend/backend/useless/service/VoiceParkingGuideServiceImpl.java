@@ -1,4 +1,4 @@
-﻿package com.backend.backend.useless.service;
+package com.backend.backend.useless.service;
 
 import org.springframework.stereotype.Service;
 

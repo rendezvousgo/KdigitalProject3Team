@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { View, Platform, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthProvider } from '../contexts/AuthContext';
 
 import HomeScreen from '../screens/HomeScreen';
@@ -18,6 +19,10 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function HomeTabs({ route, navigation }) {
+  const insets = useSafeAreaInsets();
+  const bottomPad = Platform.OS === 'ios' ? 30 : Math.max(insets.bottom + 5, 25);
+  const tabBarHeight = Platform.OS === 'ios' ? 90 : 65 + bottomPad;
+
   React.useEffect(() => {
     if (route?.params?.destination && route?.params?.timestamp) {
       navigation.navigate('HomeTab', {
@@ -57,7 +62,7 @@ function HomeTabs({ route, navigation }) {
                 borderRadius: 27,
                 justifyContent: 'center',
                 alignItems: 'center',
-                marginBottom: Platform.OS === 'ios' ? 25 : 30, // 살짝 위로 띄움
+                marginBottom: Platform.OS === 'ios' ? 25 : Math.max(bottomPad - 5, 20), // 살짝 위로 띄움
                 borderWidth: 4,
                 borderColor: '#fff', // 흰색 테두리로 분리감
                 shadowColor: '#000',
@@ -74,12 +79,11 @@ function HomeTabs({ route, navigation }) {
           }
         },
        tabBarStyle: {
-          // 전체 높이를 85로 유지하면서 내부 여백을 조정합니다.
-          height: Platform.OS === 'ios' ? 90 : 95, 
-          // 상단 여백을 줄여서 아이콘을 살짝 위로 올립니다.
+          // 전체 높이를 동적으로 설정
+          height: tabBarHeight, 
           paddingTop: 5, 
-          // 하단 패딩을 줄여야 글자가 위로 올라와서 보입니다! (15 -> 5)
-          paddingBottom: Platform.OS === 'ios' ? 30 : 25, 
+          // 하단 패딩을 시스템 네비게이션 바 높이에 맞춰 동적 설정
+          paddingBottom: bottomPad, 
           backgroundColor: '#ffffff',
           borderTopWidth: 0,
           elevation: 20,

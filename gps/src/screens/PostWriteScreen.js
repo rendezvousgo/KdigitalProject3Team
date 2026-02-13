@@ -10,14 +10,17 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createPost, updatePost } from '../services/communityApi';
 import { fetchCategories } from '../services/authApi';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function PostWriteScreen({ route, navigation }) {
   const { user, isLoggedIn } = useAuth();
+  const insets = useSafeAreaInsets();
   const editPost = route.params?.editPost || null;
   const presetCategoryId = route.params?.categoryId || null;
 
@@ -180,7 +183,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+    paddingHorizontal: 16, paddingBottom: 12,
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 16,
+    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
   cancelBtn: { paddingVertical: 6, paddingHorizontal: 4 },
   cancelText: { fontSize: 16, color: '#666' },
@@ -190,7 +195,7 @@ const styles = StyleSheet.create({
   submitText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   submitTextDisabled: { color: '#bbb' },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  scrollContent: { padding: 16, paddingBottom: 40 + (Platform.OS === 'android' ? 24 : 0) },
   formSection: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12 },
   label: { fontSize: 13, fontWeight: '600', color: '#999', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
   categorySelector: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8F8F8', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#f0f0f0' },
