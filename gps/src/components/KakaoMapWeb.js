@@ -134,6 +134,23 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
         mapRef.current.panTo(new window.kakao.maps.LatLng(lat, lng));
       }
     },
+    setCenter: (lat, lng) => {
+      if (mapRef.current && window.kakao) {
+        mapRef.current.setCenter(new window.kakao.maps.LatLng(lat, lng));
+      }
+    },
+    setLevel: (level) => {
+      if (mapRef.current) {
+        mapRef.current.setLevel(level, { animate: true });
+      }
+    },
+    focusMyLocation: (lat, lng, level = 4) => {
+      if (mapRef.current && window.kakao) {
+        const pos = new window.kakao.maps.LatLng(lat, lng);
+        mapRef.current.setCenter(pos);
+        mapRef.current.setLevel(level, { animate: true });
+      }
+    },
     drawRoute: (path) => _drawRoute(path),
     clearRoute: () => _clearRoute(),
     relayout: () => {
@@ -157,7 +174,7 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
         setStatus('loading');
         const kakao = await loadKakaoSDK();
         if (cancelled || !mapContainerRef.current) return;
-
+       /*위치 에러 원인 수정*/
         const map = new kakao.maps.Map(mapContainerRef.current, {
           center: new kakao.maps.LatLng(center.latitude, center.longitude),
           level: 4,
@@ -208,6 +225,7 @@ const KakaoMapWeb = forwardRef(function KakaoMapWeb(
   }, [parkings, status]);
 
   // routePath 변경 시 Polyline 업데이트
+  //center 변경 감지 로직
   useEffect(() => {
     if (status !== 'ready') return;
     if (routePath && routePath.length >= 2) {

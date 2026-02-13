@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>&#xac8c;&#xc2dc;&#xd310;</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --card: #ffffff;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --accent: #111827;
+      --accent-2: #2563eb;
+      --accent-3: #10b981;
+      --danger: #ef4444;
+      --soft: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Gowun Dodum", "Space Grotesk", sans-serif;
+      color: var(--ink);
+      background: radial-gradient(1200px 600px at 10% -20%, #e8f1ff 0%, transparent 60%),
+                  radial-gradient(900px 500px at 90% 0%, #e6fff4 0%, transparent 60%),
+                  var(--bg);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 28px 20px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px 20px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .subtext {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--soft);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    button, select, input, textarea {
+      font-family: inherit;
+    }
+
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+      border-radius: 12px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    }
+
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .btn.accent {
+      background: var(--accent-2);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .btn.success {
+      background: var(--accent-3);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .btn.danger {
+      background: var(--danger);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+    }
+
+    .list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .select {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      min-width: 160px;
+    }
+
+    .inline-input {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      min-width: 180px;
+    }
+
+    .chip-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--ink);
+    }
+
+    .chip.active {
+      background: #111827;
+      color: #fff;
+      border-color: #111827;
+    }
+
+    .chip.plus {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .category-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #f8fafc;
+    }
+
+    .post {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      background: #fbfcff;
+      cursor: pointer;
+    }
+
+    .post-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .post-badge {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid #c7d2fe;
+      white-space: nowrap;
+    }
+
+    .post .meta {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .post-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .muted { color: var(--muted); }
+    .hidden { display: none; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .input, .textarea {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #f9fafb;
+    }
+
+    .textarea { min-height: 140px; resize: vertical; }
+
+    .auth-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 50;
+    }
+
+    .auth-panel {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card);
+      border-radius: 22px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .auth-panel h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .auth-links {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    .auth-links button {
+      border: none;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .action-row.right {
+      justify-content: flex-end;
+    }
+
+    .comment {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .comment .meta {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .detail-body {
+      margin-top: 12px;
+      white-space: pre-wrap;
+      min-height: 140px;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+    }
+
+    @media (max-width: 720px) {
+      .header { flex-direction: column; align-items: flex-start; }
+      .toolbar { width: 100%; }
+      .btn { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="header">
+      <div>
+        <h1>&#xac8c;&#xc2dc;&#xd310;</h1>
+        
+      </div>
+      <div class="toolbar">
+        <span id="loginStatus" class="badge">&#xb85c;&#xadf8;&#xc778; &#xd544;&#xc694;</span>
+        
+        <button id="btnLoginOpen" class="btn">&#xb85c;&#xadf8;&#xc778;</button>
+        <button id="btnLogout" class="btn hidden">&#xb85c;&#xadf8;&#xc544;&#xc6c3;</button>
+        <button id="btnWrite" class="btn primary hidden">&#xae00;&#xc4f0;&#xae30;</button>
+      </div>
+    </section>
+
+    <section id="listView" class="card">
+      <div class="list-header">
+        <h2>&#xbaa9;&#xb85d;</h2>
+        <div class="action-row">
+          <div class="chip-row">
+            <div id="categoryFilterBox" class="chip-row"></div>
+            <button id="btnOpenCategoryManage" class="chip plus hidden" title="카테고리 관리">+</button>
+          </div>
+          <span id="pageIndicator" class="muted"></span>
+        </div>
+      </div>
+      <div id="postList" class="action-row" style="flex-direction:column; margin-top:14px;"></div>
+      <div id="pagination" class="action-row" style="margin-top:16px;"></div>
+    </section>
+
+    <section id="writeView" class="card hidden">
+      <h2 id="formTitle">&#xae00;&#xc4f0;&#xae30;</h2>
+      <input type="hidden" id="editId" />
+      <div class="field">
+        <label>&#xce74;&#xd14c;&#xace0;&#xb9ac;</label>
+        <select id="categorySelect" class="select"></select>
+      </div>
+      <div class="field">
+        <label>&#xc81c;&#xbaa9;</label>
+        <input id="title" class="input" type="text" />
+      </div>
+      <div class="field">
+        <label>&#xb0b4;&#xc6a9;</label>
+        <textarea id="content" class="textarea"></textarea>
+      </div>
+      <div class="action-row">
+        <button id="btnCancel" class="btn">&#xcde8;&#xc18c;</button>
+        <button id="btnSave" class="btn accent">&#xc800;&#xc7a5;</button>
+      </div>
+    </section>
+
+    <section id="detailView" class="card hidden">
+      <div id="detailContent"></div>
+      <div class="action-row right" style="margin-top: 12px;">
+        <button id="btnBack" class="btn">&#xbaa9;&#xb85d;</button>
+        <button id="btnEdit" class="btn accent">&#xc218;&#xc815;</button>
+        <button id="btnDelete" class="btn danger">&#xc0ad;&#xc81c;</button>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h3>&#xb313;&#xae00;</h3>
+        <div id="commentList" class="action-row" style="flex-direction:column; margin-top:12px;"></div>
+        <div class="field" style="margin-top:12px;">
+          <label>&#xb313;&#xae00; &#xb0b4;&#xc6a9;</label>
+          <input id="commentContent" class="input" type="text" placeholder="&#xb313;&#xae00;&#xc744; &#xc785;&#xb825;&#xd558;&#xc138;&#xc694;" />
+        </div>
+        <div class="action-row" style="justify-content:flex-end; margin-top:10px;">
+          <button id="btnCommentSave" class="btn success">&#xb313;&#xae00; &#xb4f1;&#xb85d;</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="categoryManageView" class="card hidden">
+      <div class="list-header">
+        <h2>카테고리 관리</h2>
+        <div class="action-row">
+          <button id="btnCategoryManageBack" class="btn">목록으로</button>
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>새 카테고리</label>
+        <div class="action-row">
+          <input id="newCategoryName" class="inline-input" placeholder="카테고리 이름" />
+          <button id="btnAddCategory" class="btn accent">추가</button>
+        </div>
+      </div>
+      <div id="categoryList" class="action-row" style="flex-direction:column; margin-top:14px;"></div>
+    </section>
+  </div>
+
+  <section id="authModal" class="auth-modal hidden" style="display:none;">
+    <div class="auth-panel">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <h2 id="authTitle">&#xb85c;&#xadf8;&#xc778;</h2>
+        <button id="btnAuthClose" class="btn">&#xb2eb;&#xae30;</button>
+      </div>
+
+      <div id="loginPane">
+        <div class="field">
+          <label>&#xc544;&#xc774;&#xb514;</label>
+          <input id="loginUsername" class="input" placeholder="&#xc544;&#xc774;&#xb514;" />
+        </div>
+        <div class="field">
+          <label>&#xbe44;&#xbc00;&#xbc88;&#xd638;</label>
+          <input id="loginPassword" type="password" class="input" placeholder="&#xbe44;&#xbc00;&#xbc88;&#xd638;" />
+        </div>
+        <button id="btnLogin" class="btn primary" style="width:100%;">&#xb85c;&#xadf8;&#xc778;</button>
+        <div class="auth-links" style="margin-top:8px;">
+          <button id="btnRegisterOpen">&#xd68c;&#xc6d0;&#xac00;&#xc785;</button>
+          
+        </div>
+      </div>
+
+      <div id="registerPane" class="hidden">
+        <div class="field">
+          <label>&#xc544;&#xc774;&#xb514;</label>
+          <input id="regUsername" class="input" placeholder="&#xc544;&#xc774;&#xb514;" />
+        </div>
+        <div class="field">
+          <label>&#xbe44;&#xbc00;&#xbc88;&#xd638;</label>
+          <input id="regPassword" type="password" class="input" placeholder="&#xbe44;&#xbc00;&#xbc88;&#xd638;" />
+        </div>
+        <button id="btnRegister" class="btn success" style="width:100%;">&#xd68c;&#xc6d0;&#xac00;&#xc785;</button>
+        <button id="btnBackToLogin" class="btn" style="width:100%;">&#xb85c;&#xadf8;&#xc778;&#xc73c;&#xb85c; &#xb3cc;&#xc544;&#xac00;&#xae30;</button>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const API_BASE = '/api';
+
+    const TEXT = {
+      loginRequired: '\uB85C\uADF8\uC778 \uD544\uC694',
+      loginLabel: '\uB85C\uADF8\uC778',
+      logoutLabel: '\uB85C\uADF8\uC544\uC6C3',
+      writeLabel: '\uAE00\uC4F0\uAE30',
+      loginIn: '\uB85C\uADF8\uC778 \uC911',
+      emptyPosts: '\uAC8C\uC2DC\uBB3C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.',
+      alertNeedTitle: '\uC81C\uBAA9\uACFC \uB0B4\uC6A9\uC744 \uC785\uB825\uD558\uC138\uC694.',
+      alertDelete: '\uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?',
+      alertRegisterDone: '\uD68C\uC6D0\uAC00\uC785 \uC644\uB8CC! \uB85C\uADF8\uC778 \uD574\uC8FC\uC138\uC694.',
+      
+    };
+
+    const listView = document.getElementById('listView');
+    const writeView = document.getElementById('writeView');
+    const detailView = document.getElementById('detailView');
+    const categoryManageView = document.getElementById('categoryManageView');
+
+    const postList = document.getElementById('postList');
+    const pagination = document.getElementById('pagination');
+    const pageIndicator = document.getElementById('pageIndicator');
+
+    const editId = document.getElementById('editId');
+    const titleEl = document.getElementById('title');
+    const contentEl = document.getElementById('content');
+    const formTitle = document.getElementById('formTitle');
+
+    const commentListEl = document.getElementById('commentList');
+    const commentContentEl = document.getElementById('commentContent');
+
+    const loginStatusEl = document.getElementById('loginStatus');
+    const categorySelectEl = document.getElementById('categorySelect');
+    const categoryFilterBox = document.getElementById('categoryFilterBox');
+    const btnOpenCategoryManage = document.getElementById('btnOpenCategoryManage');
+    btnOpenCategoryManage.style.display = 'none';
+    const newCategoryNameEl = document.getElementById('newCategoryName');
+    const btnAddCategory = document.getElementById('btnAddCategory');
+    const categoryListEl = document.getElementById('categoryList');
+
+    const authModal = document.getElementById('authModal');
+    authModal.classList.add('hidden');
+    const btnLoginOpen = document.getElementById('btnLoginOpen');
+    const btnLogout = document.getElementById('btnLogout');
+    const btnWrite = document.getElementById('btnWrite');
+
+    const authTitle = document.getElementById('authTitle');
+    const loginPane = document.getElementById('loginPane');
+    const registerPane = document.getElementById('registerPane');
+
+    let currentPostId = null;
+    let currentUser = null;
+    let currentCategoryId = 'all';
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text ?? '';
+      return div.innerHTML;
+    }
+
+    function formatDate(value) {
+      if (!value) return '';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleString('ko-KR');
+    }
+
+    
+
+    function hideAll() {
+      listView.classList.add('hidden');
+      writeView.classList.add('hidden');
+      detailView.classList.add('hidden');
+      categoryManageView.classList.add('hidden');
+    }
+
+    function showList() {
+      hideAll();
+      listView.classList.remove('hidden');
+      fetchPosts(0);
+    }
+
+    function showCategoryManage() {
+      if (!currentUser || currentUser.role !== 'ADMIN') {
+        openAuth('login');
+        return;
+      }
+      hideAll();
+      categoryManageView.classList.remove('hidden');
+    }
+
+    function showWrite() {
+      if (!currentUser) {
+        openAuth('login');
+        return;
+      }
+      hideAll();
+      writeView.classList.remove('hidden');
+      formTitle.textContent = '\uAE00\uC4F0\uAE30';
+      editId.value = '';
+      titleEl.value = '';
+      contentEl.value = '';
+    }
+
+    function openAuth(mode) {
+      setAuthMode(mode || 'login');
+      authModal.classList.remove('hidden');
+      authModal.style.display = 'flex';
+    }
+
+    function closeAuth() {
+      authModal.classList.add('hidden');
+      authModal.style.display = 'none';
+    }
+
+    function setAuthMode(mode) {
+      if (mode === 'register') {
+        authTitle.textContent = '\uD68C\uC6D0\uAC00\uC785';
+        loginPane.classList.add('hidden');
+        registerPane.classList.remove('hidden');
+        return;
+      }
+      authTitle.textContent = TEXT.loginLabel;
+      loginPane.classList.remove('hidden');
+      registerPane.classList.add('hidden');
+    }
+
+    function renderAuthUi() {
+      if (currentUser) {
+        loginStatusEl.textContent = `${currentUser.username} ${TEXT.loginIn}`;
+        loginStatusEl.classList.remove('hidden');
+        if (currentUser.role === 'ADMIN') {
+          btnOpenCategoryManage.classList.remove('hidden');
+          btnOpenCategoryManage.style.display = 'inline-flex';
+        } else {
+          btnOpenCategoryManage.classList.add('hidden');
+          btnOpenCategoryManage.style.display = 'none';
+        }
+        btnLoginOpen.classList.add('hidden');
+        btnLogout.classList.remove('hidden');
+        btnWrite.classList.remove('hidden');
+      } else {
+        loginStatusEl.textContent = '';
+        loginStatusEl.classList.add('hidden');
+        btnOpenCategoryManage.classList.add('hidden');
+        btnOpenCategoryManage.style.display = 'none';
+        btnLoginOpen.classList.remove('hidden');
+        btnLogout.classList.add('hidden');
+        btnWrite.classList.add('hidden');
+      }
+    }
+
+    async function fetchJson(url, options = {}) {
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        ...options,
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        let message = text || 'request failed';
+        try {
+          const parsed = JSON.parse(text);
+          message = parsed.message || parsed.error || message;
+        } catch (e) {
+          // keep text
+        }
+        throw new Error(message);
+      }
+      if (res.status === 204) return null;
+      if (!text) return null;
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        return text;
+      }
+    }
+
+    async function loadMe() {
+      try {
+        currentUser = await fetchJson(`${API_BASE}/auth/me`);
+      } catch (e) {
+        currentUser = null;
+      }
+      renderAuthUi();
+    }
+
+    async function loadCategories() {
+      try {
+        const categories = await fetchJson(`${API_BASE}/categories`);
+        const options = [{ id: 'all', name: '\uC804\uCCB4' }, ...categories];
+        categoryFilterBox.innerHTML = '';
+        options.forEach((c) => {
+          const btn = document.createElement('button');
+          btn.className = `chip ${currentCategoryId === String(c.id) ? 'active' : ''}`;
+          btn.textContent = c.name;
+          btn.addEventListener('click', () => {
+            currentCategoryId = String(c.id);
+            loadCategories();
+            fetchPosts(0);
+          });
+          categoryFilterBox.appendChild(btn);
+        });
+
+        categorySelectEl.innerHTML = '';
+        categories.forEach((c) => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name;
+          categorySelectEl.appendChild(opt);
+        });
+
+        categoryListEl.innerHTML = '';
+        categories.forEach((c) => {
+          const row = document.createElement('div');
+          row.className = 'category-row';
+          const isProtected = ['오류 제보', '오류제보', 'Q&A', 'QnA', 'QNA', '건의'].includes(c.name);
+          const canDelete = currentUser && currentUser.role === 'ADMIN' && !isProtected;
+          row.innerHTML = `
+            <span>${escapeHtml(c.name)}</span>
+            ${canDelete ? '<button class="btn danger" data-id="' + c.id + '" style="padding:6px 10px; font-size:12px;">삭제</button>' : '<span class="muted">삭제 불가</span>'}
+          `;
+          const delBtn = row.querySelector('button[data-id]');
+          if (delBtn) {
+            delBtn.addEventListener('click', async () => {
+              if (!confirm('삭제하시겠습니까?')) return;
+              try {
+                await fetchJson(`${API_BASE}/categories/${c.id}`, { method: 'DELETE' });
+                await loadCategories();
+              } catch (e) {
+                alert(e.message || '삭제 실패');
+              }
+            });
+          }
+          categoryListEl.appendChild(row);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function fetchPosts(page) {
+      const category = currentCategoryId || 'all';
+      const data = await fetchJson(`${API_BASE}/board/list?page=${page}&category=${category}`);
+      postList.innerHTML = '';
+      pagination.innerHTML = '';
+      pageIndicator.textContent = `${data.number + 1} / ${data.totalPages || 1}`;
+
+      if (data.content.length === 0) {
+        postList.innerHTML = `<p class="muted">${TEXT.emptyPosts}</p>`;
+        return;
+      }
+
+      data.content.forEach((post) => {
+        const categoryName = post.category?.name || '\uC804\uCCB4';
+        const div = document.createElement('div');
+        div.className = 'post';
+        div.innerHTML = `
+          <div class="post-body">
+            <p class="post-title">${escapeHtml(post.title || '\uC81C\uBAA9 \uC5C6\uC74C')}</p>
+            <div class="meta">
+              <span>\uC791\uC131\uC790: ${escapeHtml(post.writer || '\uC54C \uC218 \uC5C6\uC74C')}</span>
+              <span>\uC791\uC131\uC77C: ${escapeHtml(formatDate(post.createDate))}</span>
+            </div>
+          </div>
+          <div class="post-badge">${escapeHtml(categoryName)}</div>
+        `;
+        div.addEventListener('click', () => showDetail(post.id));
+        postList.appendChild(div);
+      });
+
+      for (let i = 0; i < data.totalPages; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = `${i + 1}`;
+        if (i === data.number) btn.classList.add('primary');
+        btn.addEventListener('click', () => fetchPosts(i));
+        pagination.appendChild(btn);
+      }
+    }
+
+    async function showDetail(id) {
+      hideAll();
+      detailView.classList.remove('hidden');
+      currentPostId = id;
+      const post = await fetchJson(`${API_BASE}/board/detail/${id}`);
+      const isOwner = currentUser && post.writer === currentUser.username;
+      document.getElementById('detailContent').innerHTML = `
+        <h2>${escapeHtml(post.title || '')}</h2>
+        <p class="muted">\uC791\uC131\uC790: ${escapeHtml(post.writer || '')}</p>
+        <p class="muted">\uC791\uC131\uC77C: ${escapeHtml(formatDate(post.createDate))}</p>
+        <p class="muted">\uCE74\uD14C\uACE0\uB9AC: ${escapeHtml(post.category?.name || '\uC804\uCCB4')}</p>
+        <div class="detail-body">${escapeHtml(post.content || '')}</div>
+      `;
+      document.getElementById('btnEdit').style.display = isOwner ? 'inline-block' : 'none';
+      document.getElementById('btnDelete').style.display = isOwner ? 'inline-block' : 'none';
+      await loadComments(id);
+    }
+
+    async function loadComments(id) {
+      const comments = await fetchJson(`${API_BASE}/board/${id}/comments`);
+      commentListEl.innerHTML = '';
+      if (comments.length === 0) {
+        commentListEl.innerHTML = '<p class="muted">\uB313\uAE00\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</p>';
+        return;
+      }
+      comments.forEach((c) => {
+        const div = document.createElement('div');
+        div.className = 'comment';
+        div.innerHTML = `
+          <div class="meta">
+            <span>${escapeHtml(c.writer || '\uC775\uBA85')}</span>
+            <span>${escapeHtml(formatDate(c.createDate))}</span>
+            ${currentUser && c.writer === currentUser.username ? '<button data-id="' + c.id + '" class="btn danger" style="padding:4px 8px; font-size:12px;">\uC0AD\uC81C</button>' : ''}
+          </div>
+          <div>${escapeHtml(c.content || '')}</div>
+        `;
+        const delBtn = div.querySelector('button[data-id]');
+        if (delBtn) {
+          delBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await fetchJson(`${API_BASE}/board/comments/${c.id}`, { method: 'DELETE' });
+            await loadComments(id);
+          });
+        }
+        commentListEl.appendChild(div);
+      });
+    }
+
+    document.getElementById('btnSave').addEventListener('click', async () => {
+      const payload = {
+        title: titleEl.value,
+        content: contentEl.value,
+        category: { id: categorySelectEl.value },
+      };
+      if (!payload.title || !payload.content) {
+        alert(TEXT.alertNeedTitle);
+        return;
+      }
+      if (editId.value) {
+        const updatedId = editId.value;
+        await fetchJson(`${API_BASE}/board/update/${updatedId}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+        currentPostId = updatedId;
+        await showDetail(updatedId);
+        return;
+      } else {
+        await fetchJson(`${API_BASE}/board/write`, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      }
+      showList();
+    });
+
+    document.getElementById('btnCancel').addEventListener('click', showList);
+    document.getElementById('btnBack').addEventListener('click', showList);
+
+    document.getElementById('btnEdit').addEventListener('click', async () => {
+      const post = await fetchJson(`${API_BASE}/board/detail/${currentPostId}`);
+      showWrite();
+      formTitle.textContent = '\uAE00 \uC218\uC815';
+      editId.value = post.id;
+      titleEl.value = post.title || '';
+      contentEl.value = post.content || '';
+      if (post.category?.id) categorySelectEl.value = post.category.id;
+    });
+
+    document.getElementById('btnDelete').addEventListener('click', async () => {
+      if (!confirm(TEXT.alertDelete)) return;
+      try {
+        await fetchJson(`${API_BASE}/board/delete/${currentPostId}`, { method: 'DELETE' });
+        alert('삭제되었습니다.');
+      } catch (e) {
+        alert(e.message || '삭제 실패');
+      } finally {
+        currentPostId = null;
+        closeAuth();
+        showList();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+
+    document.getElementById('btnCommentSave').addEventListener('click', async () => {
+      if (!currentUser) {
+        openAuth('login');
+        return;
+      }
+      const payload = { content: commentContentEl.value };
+      if (!payload.content) return;
+      await fetchJson(`${API_BASE}/board/${currentPostId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      commentContentEl.value = '';
+      await loadComments(currentPostId);
+    });
+
+    btnLoginOpen.addEventListener('click', () => openAuth('login'));
+    document.getElementById('btnAuthClose').addEventListener('click', closeAuth);
+
+    document.getElementById('btnRegisterOpen').addEventListener('click', () => setAuthMode('register'));
+    document.getElementById('btnBackToLogin').addEventListener('click', () => setAuthMode('login'));
+
+    document.getElementById('btnLogin').addEventListener('click', async () => {
+      const payload = {
+        username: document.getElementById('loginUsername').value,
+        password: document.getElementById('loginPassword').value,
+      };
+      try {
+        const user = await fetchJson(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        currentUser = user;
+        renderAuthUi();
+        closeAuth();
+        alert('로그인이 되었습니다.');
+      } catch (e) {
+        alert('아이디 또는 비밀번호가 틀렸습니다.');
+      }
+    });
+
+    document.getElementById('btnRegister').addEventListener('click', async () => {
+      const payload = {
+        username: document.getElementById('regUsername').value,
+        password: document.getElementById('regPassword').value,
+      };
+      await fetchJson(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      alert(TEXT.alertRegisterDone);
+      setAuthMode('login');
+    });
+
+    
+
+    btnLogout.addEventListener('click', async () => {
+      try {
+        await fetch(`${API_BASE}/auth/logout`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch (e) {
+        console.error(e);
+      }
+      currentUser = null;
+      renderAuthUi();
+      showList();
+      alert('로그아웃 되었습니다.');
+    });
+
+    btnWrite.addEventListener('click', showWrite);
+
+    btnAddCategory.addEventListener('click', async () => {
+      const name = newCategoryNameEl.value.trim();
+      if (!name) return;
+      try {
+        await fetchJson(`${API_BASE}/categories`, {
+          method: 'POST',
+          body: JSON.stringify({ name }),
+        });
+        newCategoryNameEl.value = '';
+        await loadCategories();
+      } catch (e) {
+        alert('카테고리 추가 실패');
+      }
+    });
+
+    btnOpenCategoryManage.addEventListener('click', showCategoryManage);
+    document.getElementById('btnCategoryManageBack').addEventListener('click', showList);
+
+    (async function init() {
+      closeAuth();
+      await loadMe();
+      await loadCategories();
+      showList();
+    })();
+  </script>
+</body>
+</html>

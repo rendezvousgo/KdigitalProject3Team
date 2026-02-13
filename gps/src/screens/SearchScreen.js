@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,   // ★ 추가
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
@@ -56,11 +57,19 @@ export default function SearchScreen({ navigation, route }) {
   };
 
   const handleSelectResult = (item) => {
-    // eventBus로 HomeScreen에 직접 목적지 전달 (navigation params 우회)
-    emit('navigateToDestination', item);
-    // Home 화면의 HomeTab으로 이동 (Stack modal 닫기 + Tab 전환)
+    // Home 화면의 HomeTab으로 이동하면서 destination params 전달
     const rootNav = navigation.getParent?.() || navigation;
-    rootNav.navigate('Home', { screen: 'HomeTab' });
+    rootNav.navigate('Home', {
+      screen: 'HomeTab',
+      params: {
+        destination: { name: item.name, lat: item.lat, lng: item.lng, address: item.address },
+        timestamp: Date.now(),
+      },
+    });
+    // eventBus도 보내기 (HomeScreen이 이미 마운트된 경우 즉시 처리)
+    setTimeout(() => {
+      emit('navigateToDestination', item);
+    }, 300);
   };
 
   const renderSearchResult = ({ item }) => (
@@ -232,7 +241,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    // paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 10,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
@@ -247,7 +258,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 6,
   },
   searchInput: {
     flex: 1,

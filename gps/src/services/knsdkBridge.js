@@ -39,14 +39,25 @@ export async function initKNSDK() {
  * @param {number} destLng - 목적지 경도
  * @param {string} destName - 목적지 이름
  */
-export async function startNavigation(destLat, destLng, destName, startLat, startLng) {
+export async function startNavigation(destLat, destLng, destName, startLat, startLng, waypoints = []) {
   // Android: KNSDK 3D 내비
   if (Platform.OS === 'android' && KNSDKModule) {
     try {
-      const result = await KNSDKModule.startNavi(
-        destLat, destLng, destName,
-        startLat || 0, startLng || 0
-      );
+      let result;
+      // 경유지가 있으면 경유지 포함 메서드 사용
+      if (waypoints && waypoints.length > 0 && KNSDKModule.startNaviWithWaypoints) {
+        const waypointsJson = JSON.stringify(waypoints);
+        result = await KNSDKModule.startNaviWithWaypoints(
+          destLat, destLng, destName,
+          startLat || 0, startLng || 0,
+          waypointsJson
+        );
+      } else {
+        result = await KNSDKModule.startNavi(
+          destLat, destLng, destName,
+          startLat || 0, startLng || 0
+        );
+      }
       console.log('내비 시작:', result);
       return { success: true, method: 'knsdk' };
     } catch (error) {

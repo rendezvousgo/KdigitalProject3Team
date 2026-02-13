@@ -108,6 +108,47 @@ class KNSDKModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     @ReactMethod
+    fun startNaviWithWaypoints(
+        destLat: Double, destLng: Double, destName: String,
+        startLat: Double, startLng: Double,
+        waypointsJson: String,
+        promise: Promise
+    ) {
+        try {
+            if (!isInitialized) {
+                promise.reject("NOT_INITIALIZED", "KNSDK가 초기화되지 않았습니다.")
+                return
+            }
+            val activity = reactApplicationContext.currentActivity
+            if (activity == null) {
+                promise.reject("NO_ACTIVITY", "Activity를 찾을 수 없습니다.")
+                return
+            }
+            val destKatec = MainApplication.knsdk.convertWGS84ToKATEC(destLng, destLat)
+            var startKatecX = 0
+            var startKatecY = 0
+            if (startLat != 0.0 && startLng != 0.0) {
+                val startKatec = MainApplication.knsdk.convertWGS84ToKATEC(startLng, startLat)
+                startKatecX = startKatec.x.toInt()
+                startKatecY = startKatec.y.toInt()
+            }
+            Log.d(TAG, "경유지 포함 내비 시작: waypoints=$waypointsJson")
+            val intent = Intent(activity, KNNaviActivity::class.java)
+            intent.putExtra("dest_name", destName)
+            intent.putExtra("dest_lng", destKatec.x.toInt())
+            intent.putExtra("dest_lat", destKatec.y.toInt())
+            intent.putExtra("start_lng", startKatecX)
+            intent.putExtra("start_lat", startKatecY)
+            intent.putExtra("waypoints_json", waypointsJson)
+            activity.startActivity(intent)
+            promise.resolve("내비게이션 시작 (경유지 포함)")
+        } catch (e: Exception) {
+            Log.e(TAG, "내비게이션 시작 실패 (경유지)", e)
+            promise.reject("NAVI_ERROR", "내비게이션 시작 실패: ${e.message}")
+        }
+    }
+
+    @ReactMethod
     fun isReady(promise: Promise) {
         promise.resolve(isInitialized)
     }
