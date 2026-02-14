@@ -1,23 +1,30 @@
-import React from 'react';
+﻿import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { View, Platform } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Platform, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthProvider } from '../contexts/AuthContext';
 
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import AIAssistantScreen from '../screens/AIAssistantScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import CommunityScreen from '../screens/CommunityScreen';
+import PostDetailScreen from '../screens/PostDetailScreen';
+import PostWriteScreen from '../screens/PostWriteScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function HomeTabs({ route, navigation }) {
-  // Stack에서 전달된 params를 Tab 내부 HomeScreen에 전달
+  const insets = useSafeAreaInsets();
+  const bottomPad = Platform.OS === 'ios' ? 30 : Math.max(insets.bottom + 5, 25);
+  const tabBarHeight = Platform.OS === 'ios' ? 90 : 65 + bottomPad;
+
   React.useEffect(() => {
     if (route?.params?.destination && route?.params?.timestamp) {
-      // HomeTab으로 직접 navigate하여 params 전달
       navigation.navigate('HomeTab', {
         destination: route.params.destination,
         timestamp: route.params.timestamp,
@@ -30,46 +37,66 @@ function HomeTabs({ route, navigation }) {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+
           if (route.name === 'HomeTab') {
-            return <Ionicons name={focused ? 'map' : 'map-outline'} size={size} color={color} />;
+            iconName = focused ? 'map' : 'map-outline';
+            return <Ionicons name={iconName} size={size} color={color} />;
           } else if (route.name === 'SearchTab') {
-            return <Ionicons name={focused ? 'search' : 'search-outline'} size={size} color={color} />;
+            iconName = focused ? 'search' : 'search-outline';
+            return <Ionicons name={iconName} size={size} color={color} />;
+          } else if (route.name === 'CommunityTab') {
+            // 게시판은 말풍선이나 리스트 아이콘
+            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+            return <Ionicons name={iconName} size={size} color={color} />;
+          } else if (route.name === 'ProfileTab') {
+            iconName = focused ? 'person' : 'person-outline';
+            return <Ionicons name={iconName} size={size} color={color} />;
           } else if (route.name === 'AITab') {
+            // ★☆ 중앙 AI 버튼 특별 디자인 ★☆
             return (
               <View style={{
-                backgroundColor: focused ? '#5856D6' : '#E8E7FF',
-                width: 50,
-                height: 50,
-                borderRadius: 25,
+                backgroundColor: '#FFD700', // 요청하신 노란색 계열 (Gold)
+                width: 54,
+                height: 54,
+                borderRadius: 27,
                 justifyContent: 'center',
                 alignItems: 'center',
-                marginBottom: Platform.OS === 'ios' ? 20 : 0,
-                shadowColor: '#5856D6',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: focused ? 0.4 : 0,
-                shadowRadius: 8,
-                elevation: focused ? 8 : 0,
+                marginBottom: Platform.OS === 'ios' ? 25 : Math.max(bottomPad - 5, 20), // 살짝 위로 띄움
+                borderWidth: 4,
+                borderColor: '#fff', // 흰색 테두리로 분리감
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 5 },
+                shadowOpacity: 0.2,
+                shadowRadius: 5,
+                elevation: 10,
               }}>
-                <Ionicons name="sparkles" size={24} color={focused ? '#fff' : '#5856D6'} />
+                <MaterialCommunityIcons name="robot" size={28} color="#007AFF" /> 
+                {/* 노란 바닥에 파란 AI 로봇 아이콘 */}
               </View>
             );
-          } else if (route.name === 'ProfileTab') {
-            return <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />;
+
           }
         },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#999',
-        tabBarStyle: {
-          height: Platform.OS === 'ios' ? 88 : 82,
-          paddingTop: 6,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 22,
-          backgroundColor: '#fff',
-          borderTopWidth: 1,
-          borderTopColor: '#f0f0f0',
+       tabBarStyle: {
+          // 전체 높이를 동적으로 설정
+          height: tabBarHeight, 
+          paddingTop: 5, 
+          // 하단 패딩을 시스템 네비게이션 바 높이에 맞춰 동적 설정
+          paddingBottom: bottomPad, 
+          backgroundColor: '#ffffff',
+          borderTopWidth: 0,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
+          fontSize: 11, // 글씨 크기를 11로 살짝 키우면 더 잘 보여요.
+          fontWeight: '700', // 좀 더 두껍게 해서 가독성 확보!
+          // 하단 마진을 10 정도로 주어 바닥에서 살짝 띄웁니다.
+          marginBottom: Platform.OS === 'ios' ? 0 : 14, 
         },
       })}
     >
@@ -83,15 +110,21 @@ function HomeTabs({ route, navigation }) {
         component={SearchScreen}
         options={{ tabBarLabel: '검색' }}
       />
+      {/* ★☆ AI 탭을 정중앙에 배치 ★☆ */}
       <Tab.Screen 
         name="AITab" 
         component={AIAssistantScreen}
-        options={{ tabBarLabel: 'AI 추천' }}
+        options={{ tabBarLabel: '' }} // AI는 버튼이 커서 라벨을 빼는 게 예쁩니다
+      />
+      <Tab.Screen 
+        name="CommunityTab" 
+        component={CommunityScreen}
+        options={{ tabBarLabel: '게시판' }}
       />
       <Tab.Screen 
         name="ProfileTab" 
         component={ProfileScreen}
-        options={{ tabBarLabel: '마이' }}
+        options={{ tabBarLabel: '마이페이지' }}
       />
     </Tab.Navigator>
   );
@@ -99,28 +132,35 @@ function HomeTabs({ route, navigation }) {
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        <Stack.Screen name="Home" component={HomeTabs} />
-        <Stack.Screen 
-          name="Search" 
-          component={SearchScreen}
-          options={{
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen 
-          name="AIAssistant" 
-          component={AIAssistantScreen}
-          options={{
-            presentation: 'card',
-          }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AuthProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Home" component={HomeTabs} />
+          <Stack.Screen 
+            name="Search" 
+            component={SearchScreen}
+            options={{ presentation: 'modal' }}
+          />
+          <Stack.Screen 
+            name="AIAssistant" 
+            component={AIAssistantScreen}
+          />
+          <Stack.Screen 
+            name="PostDetail" 
+            component={PostDetailScreen}
+            options={{
+              presentation: 'card',
+            }}
+          />
+          <Stack.Screen 
+            name="PostWrite" 
+            component={PostWriteScreen}
+            options={{
+              presentation: 'modal',
+            }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </AuthProvider>
   );
 }

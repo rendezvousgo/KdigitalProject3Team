@@ -13,7 +13,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "?뚯꽦 ?몄떇???꾪빐 留덉씠???묎렐???꾩슂?⑸땲??"
+      }
     },
     "android": {
       "package": "com.safeparking.app",
@@ -25,7 +28,8 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "INTERNET"
+        "INTERNET",
+        "RECORD_AUDIO"
       ]
     },
     "web": {

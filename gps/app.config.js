@@ -50,7 +50,7 @@ export default {
     [
       'expo-location',
       {
-        locationAlwaysAndWhenInUsePermission: 'SafeParking이 주변 주차장과 단속카메라 정보를 제공하기 위해 위치 정보가 필요합니다.'
+        locationAlwaysAndWhenInUsePermission: 'SafeParking??二쇰? 二쇱감?κ낵 ?⑥냽移대찓???뺣낫瑜??쒓났?섍린 ?꾪빐 ?꾩튂 ?뺣낫媛 ?꾩슂?⑸땲??'
       }
     ]
   ],

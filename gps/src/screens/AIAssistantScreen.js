@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,28 +12,55 @@ import {
   Animated,
   Modal,
   Vibration,
+  StatusBar,
+  Alert,
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
+import Voice from '@react-native-voice/voice';
+import * as Location from 'expo-location';
+import { formatDistance } from '../services/api';
+import { processUserMessage, resetConversation } from '../services/gptParkingService';
+import { emit } from '../services/eventBus';
+import { startNavigation as startKNSDKNavi } from '../services/knsdkBridge';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// 더미 AI 대화
+// 기본 AI 안내
 const INITIAL_MESSAGES = [
   {
     id: 1,
     type: 'ai',
-    text: '안녕하세요, 세이프파킹입니다.\n\n목적지 주변의 단속 현황과 안전한 주차 공간을 안내해 드릴게요. 어디로 가시나요?',
+    text: '안녕하세요. SafeParking AI입니다.\n목적지 또는 주차장 검색 조건을 말씀해주세요.',
     time: '방금',
   },
 ];
 
 const QUICK_QUESTIONS = [
-  '시청 근처 주차장 추천',
-  '가까운 무료 주차장',
-  '단속 없는 안전 구역',
-  '30분 단기 주차',
+  '근처 주차장 찾아줘',
+  '무료 공영 주차장',
+  '가까운 순으로 5개',
+  '시청 근처 주차장',
 ];
 
+// ── 마스코트 호출어 ──
+const WAKE_WORD = '파키';
+const WAKE_PATTERNS = ['파키야', '파키아', '파키 야', '파키 아', '빠키야', '빠키아', '바키야', '바키아', '파 키야', '팍이야', '파키여'];
+
+// ── 거리 포맷 헬퍼 ──
+function formatDistKm(distKm) {
+  if (distKm == null || isNaN(distKm)) return '거리 정보 없음';
+  if (distKm < 0.01) return '근처';
+  if (distKm < 1) return `${Math.round(distKm * 1000)}m`;
+  return `${distKm.toFixed(1)}km`;
+}
+function formatDistMeters(distM) {
+  if (distM == null || isNaN(distM)) return '거리 정보 없음';
+  if (distM < 1000) return `${Math.round(distM)}m`;
+  return `${(distM / 1000).toFixed(1)}km`;
+}
+
 export default function AIAssistantScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -41,10 +68,21 @@ export default function AIAssistantScreen({ navigation }) {
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [wakeWordMode, setWakeWordMode] = useState(false);
+  const [conversationMode, setConversationMode] = useState(false); // 1분 대화 모드
+  const [userLocation, setUserLocation] = useState(null);
   const flatListRef = useRef(null);
   const typingDots = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const waveAnim = useRef(new Animated.Value(0)).current;
+  const recognizedTextRef = useRef('');
+  const sendMessageRef = useRef(null);
+  const wakeWordModeRef = useRef(false);
+  const wakeWordRestartTimer = useRef(null);
+  const conversationTimer = useRef(null); // 1분 대화모드 타이머
+  const conversationModeRef = useRef(false);
+  const voiceModalVisibleRef = useRef(false); // ★ STT 이벤트에서 modal 상태 참조용
+  const voiceStartTimeRef = useRef(0); // ★ 음성 시작 시각 (레이스 컨디션 방지)
 
   useEffect(() => {
     if (isTyping) {
@@ -78,6 +116,227 @@ export default function AIAssistantScreen({ navigation }) {
     }
   }, [isListening]);
 
+  // ── 호출어 감지 헬퍼 ──
+  const extractWakeWordCommand = (text) => {
+    if (!text) return null;
+    // "파키야", "파키 야", "빠키야", "바키야" 등 호출어 감지 후 뒤의 명령어 추출
+    const match = text.match(/[파빠바]\s*키\s*[야아여]/i);
+    if (match) {
+      const cmd = text.slice(match.index + match[0].length).trim();
+      return cmd || null;
+    }
+    return null;
+  };
+
+  // ── 호출어 모드: 조용히 계속 듣기 ──
+  const startWakeWordListening = async () => {
+    if (!wakeWordModeRef.current) return;
+    try {
+      try { await Voice.cancel(); } catch (_) {}
+      await new Promise(r => setTimeout(r, 150));
+      await Voice.start('ko-KR');
+      console.log('[WakeWord] 대기 중...');
+    } catch (err) {
+      console.log('[WakeWord] 재시작 실패:', err);
+      // 잠시 후 재시도
+      if (wakeWordModeRef.current) {
+        wakeWordRestartTimer.current = setTimeout(() => startWakeWordListening(), 2000);
+      }
+    }
+  };
+
+  const toggleWakeWordMode = async () => {
+    const next = !wakeWordMode;
+    setWakeWordMode(next);
+    wakeWordModeRef.current = next;
+    if (next) {
+      Vibration.vibrate(100);
+      startWakeWordListening();
+    } else {
+      if (wakeWordRestartTimer.current) clearTimeout(wakeWordRestartTimer.current);
+      try { await Voice.cancel(); } catch (_) {}
+      // 대화모드도 같이 끄기
+      stopConversationMode();
+    }
+  };
+
+  // ── 1분 대화 모드: 파키야 없이도 음성 자동 수신 ──
+  const startConversationMode = () => {
+    if (!wakeWordModeRef.current) return; // 호출어 모드가 켜져있을 때만
+    console.log('[ConvMode] 1분 대화 모드 시작');
+    setConversationMode(true);
+    conversationModeRef.current = true;
+    // 이전 타이머 클리어
+    if (conversationTimer.current) clearTimeout(conversationTimer.current);
+    // 60초 후 자동 해제
+    conversationTimer.current = setTimeout(() => {
+      console.log('[ConvMode] 1분 경과 → 대화 모드 종료');
+      stopConversationMode();
+    }, 60000);
+  };
+
+  const stopConversationMode = () => {
+    setConversationMode(false);
+    conversationModeRef.current = false;
+    if (conversationTimer.current) {
+      clearTimeout(conversationTimer.current);
+      conversationTimer.current = null;
+    }
+  };
+
+  // 대화모드에서 호출어없이 직접 청취 시작
+  const startConversationListening = async () => {
+    if (!conversationModeRef.current || !wakeWordModeRef.current) return;
+    try {
+      try { await Voice.cancel(); } catch (_) {}
+      await new Promise(r => setTimeout(r, 150));
+      await Voice.start('ko-KR');
+      console.log('[ConvMode] 대화 청취 중...');
+    } catch (err) {
+      console.log('[ConvMode] 청취 시작 실패:', err);
+      if (conversationModeRef.current) {
+        wakeWordRestartTimer.current = setTimeout(() => startConversationListening(), 2000);
+      }
+    }
+  };
+
+  // 화면 떠날 때 호출어 모드 정리
+  useEffect(() => {
+    return () => {
+      wakeWordModeRef.current = false;
+      conversationModeRef.current = false;
+      if (wakeWordRestartTimer.current) clearTimeout(wakeWordRestartTimer.current);
+      if (conversationTimer.current) clearTimeout(conversationTimer.current);
+      Voice.destroy().catch(() => {});
+    };
+  }, []);
+
+  // ★ voiceModalVisible ref 동기화
+  useEffect(() => {
+    voiceModalVisibleRef.current = voiceModalVisible;
+  }, [voiceModalVisible]);
+
+  // STT 이벤트 처리 (★ 의존성 [] — 한 번만 등록, ref로 상태 참조)
+  useEffect(() => {
+    Voice.onSpeechStart = () => {
+      console.log('STT: onSpeechStart');
+    };
+
+    Voice.onSpeechResults = (event) => {
+      const text = event?.value?.[0] ?? '';
+      console.log('STT: onSpeechResults -', text);
+
+      // ── 대화 모드: 호출어 없이도 직접 전송 ──
+      if (conversationModeRef.current && wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        if (text && text.trim()) {
+          console.log('[ConvMode] 대화 모드 입력:', text);
+          Vibration.vibrate([0, 100, 50, 100]);
+          const cmd = extractWakeWordCommand(text);
+          const finalText = cmd || text;
+          setInputText(finalText);
+          sendMessageRef.current?.(finalText);
+          startConversationMode();
+        } else {
+          wakeWordRestartTimer.current = setTimeout(() => startConversationListening(), 500);
+        }
+        return;
+      }
+
+      // ── 호출어 모드: 호출어 감지 시 명령 처리 ──
+      if (wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        const cmd = extractWakeWordCommand(text);
+        if (cmd) {
+          console.log('[WakeWord] 명령 감지:', cmd);
+          Vibration.vibrate([0, 100, 50, 100]);
+          setInputText(cmd);
+          sendMessageRef.current?.(cmd);
+        } else {
+          console.log('[WakeWord] 호출어 없음, 재시작');
+        }
+        wakeWordRestartTimer.current = setTimeout(() => startWakeWordListening(), 500);
+        return;
+      }
+
+      // ── 일반 STT 모드 ──
+      recognizedTextRef.current = text;
+      setInputText(text);
+      setIsListening(false);
+      setVoiceModalVisible(false);
+      if (text && text.trim()) {
+        const cmd = extractWakeWordCommand(text);
+        sendMessageRef.current?.(cmd || text);
+      }
+    };
+
+    Voice.onSpeechPartialResults = (event) => {
+      const text = event?.value?.[0] ?? '';
+      if (wakeWordModeRef.current && !voiceModalVisibleRef.current) return;
+      console.log('STT: partial -', text);
+      if (text) {
+        recognizedTextRef.current = text;
+        setInputText(text);
+      }
+    };
+
+    Voice.onSpeechEnd = () => {
+      console.log('STT: onSpeechEnd');
+      if (conversationModeRef.current && wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        return;
+      }
+      if (wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        return;
+      }
+      // ★ 모달이 열린 직후 바로 end가 날아오는 경우 무시 (800ms 이내)
+      if (voiceModalVisibleRef.current && Date.now() - voiceStartTimeRef.current < 800) {
+        console.log('STT: onSpeechEnd 무시 (너무 빠른 종료)');
+        // 재시작 시도
+        setTimeout(async () => {
+          try { await Voice.start('ko-KR'); } catch(_) {}
+        }, 300);
+        return;
+      }
+      setIsListening(false);
+      // ★ Voice.destroy() 제거 — cancel만 수행 (2회차 STT 오류 방지)
+      Voice.cancel().catch(() => {});
+    };
+
+    Voice.onSpeechError = (e) => {
+      console.log('STT: onSpeechError', JSON.stringify(e));
+      const code = e?.error?.code ?? e?.error ?? '';
+
+      if (conversationModeRef.current && wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        wakeWordRestartTimer.current = setTimeout(() => startConversationListening(), 1000);
+        return;
+      }
+
+      if (wakeWordModeRef.current && !voiceModalVisibleRef.current) {
+        wakeWordRestartTimer.current = setTimeout(() => startWakeWordListening(), 1000);
+        return;
+      }
+
+      // ★ 모달이 열린 직후 에러가 날아오는 경우 다시 시도 (800ms 이내)
+      if (voiceModalVisibleRef.current && Date.now() - voiceStartTimeRef.current < 800) {
+        console.log('STT: onSpeechError 무시 (너무 빠른 에러), 재시도');
+        setTimeout(async () => {
+          try { await Voice.start('ko-KR'); } catch(_) {}
+        }, 300);
+        return;
+      }
+
+      setIsListening(false);
+      setVoiceModalVisible(false);
+      // ★ 무해한 에러 코드 무시 (7=no match, 6=speech timeout, 2=network, 5=client, 11=not recognized)
+      const ignoreCodes = ['2', '5', '6', '7', '11', '12', '13'];
+      if (!ignoreCodes.includes(String(code))) {
+        Alert.alert('음성 인식 오류', `음성 인식 중 오류가 발생했습니다. (코드: ${code})`);
+      }
+    };
+
+    return () => {
+      Voice.removeAllListeners();
+    };
+  }, []); // ★ 의존성 제거 — 리스너 한 번만 등록
+
   // TTS로 응답 읽기
   const speakResponse = async (text) => {
     if (!voiceEnabled) return;
@@ -103,110 +362,233 @@ export default function AIAssistantScreen({ navigation }) {
     setIsSpeaking(false);
   };
 
-  // 음성 입력 모달 열기
-  const startVoiceInput = () => {
+  const startVoiceInputReal = async () => {
+    try {
+      const available = await Voice.isAvailable();
+      if (!available) {
+        Alert.alert('음성 인식 불가', '이 기기에서 음성 인식을 사용할 수 없습니다.\n설정 > Google > 음성 인식에서 확인해주세요.');
+        return;
+      }
+    } catch (checkErr) {
+      console.log('STT: isAvailable 체크 실패:', checkErr);
+    }
+
+    // ★ 이전 세션 정리 (두 번째 클릭 오류 방지)
+    try {
+      await Voice.stop();
+    } catch (_) {}
+    try {
+      await Voice.cancel();
+    } catch (_) {}
+    // ★ Voice.destroy() 제거 — destroy하면 네이티브 인식기가 파괴되어 2회차 실패
+    await new Promise(r => setTimeout(r, 200));
+
     setVoiceModalVisible(true);
     setIsListening(true);
+    voiceStartTimeRef.current = Date.now(); // ★ 시작 시각 기록 (레이스 컨디션 방지)
     Vibration.vibrate(50);
-    
-    // 실제로는 여기서 STT 시작
-    // 데모: 3초 후 자동으로 인식된 텍스트 시뮬레이션
-    setTimeout(() => {
-      simulateVoiceRecognition();
-    }, 3000);
-  };
 
-  // 음성 인식 시뮬레이션 (실제로는 STT API 연동)
-  const simulateVoiceRecognition = () => {
-    const demoTexts = [
-      '강남역 근처 30분 주차할 곳 찾아줘',
-      '여기서 가장 가까운 무료 주차장 알려줘',
-      '단속 없는 안전한 곳으로 안내해줘',
-    ];
-    const randomText = demoTexts[Math.floor(Math.random() * demoTexts.length)];
-    
-    setIsListening(false);
-    setInputText(randomText);
-    
-    setTimeout(() => {
+    recognizedTextRef.current = '';
+    setInputText('');
+
+    try {
+      await Voice.start('ko-KR');
+      console.log('STT: Voice.start() 성공');
+    } catch (error) {
+      console.log('STT: Voice.start() 에러:', error);
+      setIsListening(false);
       setVoiceModalVisible(false);
-      sendMessage(randomText);
-    }, 500);
+
+      const msg = error?.message || String(error);
+      if (msg.includes('startSpeech') || msg.includes('null')) {
+        Alert.alert('음성 인식 오류', '음성 인식 모듈을 초기화할 수 없습니다.\n앱을 완전히 종료 후 다시 시작해주세요.');
+      } else if (msg.includes('permission') || msg.includes('Permission')) {
+        Alert.alert('권한 필요', '마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
+      } else {
+        Alert.alert('음성 인식 오류', `음성 인식 시작 실패: ${msg}`);
+      }
+    }
   };
 
-  // 음성 입력 취소
-  const cancelVoiceInput = () => {
+  const cancelVoiceInputReal = async () => {
     setIsListening(false);
     setVoiceModalVisible(false);
     setInputText('');
+    recognizedTextRef.current = '';
+
+    try {
+      await Voice.cancel();
+    } catch (error) {
+      // noop
+    }
+
+    // 호출어 모드가 켜져있으면 다시 대기 시작
+    if (wakeWordModeRef.current) {
+      wakeWordRestartTimer.current = setTimeout(() => startWakeWordListening(), 500);
+    }
   };
 
-  const sendMessage = (text) => {
+  // (시뮬레이션 코드 제거됨 — 실제 STT만 사용)
+   const ensureLocation = async () => {
+    if (userLocation) return userLocation;
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      throw new Error('위치 권한이 필요합니다.');
+    }
+    const loc = await Location.getCurrentPositionAsync({});
+    const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+    setUserLocation(coords);
+    return coords;
+  };
+
+  // 최근 대화 맥락 생성 (GPT에 전달용, 최근 4개 메시지)
+  const buildConversationContext = () => {
+    return messages
+      .slice(-4)
+      .map(m => `${m.type === 'user' ? '사용자' : 'AI'}: ${m.text.slice(0, 120)}`)
+      .join('\n');
+  };
+
+  const sendMessage = async (text) => {
     if (!text.trim()) return;
 
+    // ★ 호출어 접두사 제거 (텍스트 입력에서도 "파키야" 처리)
+    const wakeCmd = extractWakeWordCommand(text);
+    const cleanText = wakeCmd || text;
+
     const userMessage = {
-      id: messages.length + 1,
+      id: Date.now(),
       type: 'user',
       text: text,
       time: '방금',
     };
 
-    setMessages([...messages, userMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsTyping(true);
 
-    // AI 응답 시뮬레이션
-    setTimeout(() => {
+    try {
+      const coords = await ensureLocation();
+      const ctx = buildConversationContext();
+
+      // GPT 파이프라인: 분류(Nano) → 검증 → 데이터 조회 → 답변(Mini)
+      const result = await processUserMessage(
+        cleanText,
+        coords.latitude,
+        coords.longitude,
+        ctx,
+      );
+
+      // 주차장 추천 카드 빌드 (route_set은 경로 카드만 표시, 주차장 카드 생략)
+      const skipRecommendations = result.action === 'navigateToMap' || result.table?.intent === 'route_set';
+      const recommendations = (!skipRecommendations && result.parkingList?.length > 0)
+        ? result.parkingList.filter(p => p.type !== 'place').map(p => ({
+            name: p.name || '주차장',
+            distance: formatDistKm(p.distance),
+            available: p.capacity || null,
+            price: p.fee || null,
+            safe: true,
+            lat: p.lat,
+            lng: p.lng,
+          }))
+        : null;
+
+      // 경로 정보가 있으면 메시지에 포함
+      const routeInfo = result.routeInfo || null;
+
+      const aiResponse = {
+        id: Date.now(),
+        type: 'ai',
+        text: result.text,
+        recommendations: recommendations?.length > 0 ? recommendations : null,
+        routeInfo,
+        time: '방금',
+      };
+
       setIsTyping(false);
-      const aiResponse = generateAIResponse(text);
       setMessages(prev => [...prev, aiResponse]);
-      
-      // TTS로 응답 읽기
+
+      // ★ 재요청/롤백 응답 → 대화 모드 시작 (파키야 없이 1분 청취)
+      if (result.needsClarification) {
+        if (voiceEnabled) {
+          speakResponse(aiResponse.text);
+        }
+        // 호출어 모드가 켜져있으면 대화 모드 시작
+        if (wakeWordModeRef.current) {
+          startConversationMode();
+          // TTS 끝난 후 청취 시작 (1.5초 여유)
+          setTimeout(() => startConversationListening(), 1500);
+        }
+        return;
+      }
+
+      // route_set → 3D 네비게이션 바로 시작 (KNSDK)
+      if (result.action === 'navigateToMap' && result.routeInfo) {
+        const ri = result.routeInfo;
+        // TTS 안내
+        if (voiceEnabled) {
+          speakResponse(aiResponse.text);
+        }
+        // 경유지 좌표 수집
+        const waypoints = (ri.waypointCoords || []).map((wp, i) => ({
+          lat: wp.lat,
+          lng: wp.lng,
+          name: ri.waypointNames?.[i] || `경유지${i + 1}`,
+        }));
+        // 내비 3D 시작
+        setTimeout(async () => {
+          try {
+            await startKNSDKNavi(
+              ri.destLat, ri.destLng, ri.destName || '목적지',
+              coords.latitude, coords.longitude,
+              waypoints,
+            );
+            console.log('AI → KNSDK 3D 네비 시작', waypoints.length > 0 ? `(경유지 ${waypoints.length}곳)` : '');
+          } catch (navErr) {
+            console.log('KNSDK 시작 실패, 지도로 폴백:', navErr);
+            emit('navigateToDestination', { name: ri.destName, lat: ri.destLat, lng: ri.destLng });
+            navigation.navigate('HomeTab');
+          }
+        }, 500);
+        return;
+      }
+
       if (voiceEnabled) {
         speakResponse(aiResponse.text);
       }
-    }, 1500);
-  };
 
-  const generateAIResponse = (userText) => {
-    // 간단한 응답 로직 (실제로는 API 연동)
-    let response = '';
-    let recommendations = null;
+      // ★ 일반 응답이어도 호출어 모드 + 대화 모드면 계속 청취
+      if (conversationModeRef.current && wakeWordModeRef.current) {
+        // TTS 끝난 후 재청취
+        setTimeout(() => startConversationListening(), 1500);
+      }
+    } catch (error) {
+      console.log('GPT pipeline error:', error?.message, error);
+      setIsTyping(false);
 
-    if (userText.includes('시청') || userText.includes('서울')) {
-      response = '시청 근처 분석 결과입니다.\n\n세종대로 일대는 주정차 단속이 집중되는 구역이에요. 아래 주차장을 추천드립니다.';
-      recommendations = [
-        { name: '서울시청 공영주차장', distance: '도보 3분', available: 23, price: '10분 500원', safe: true },
-        { name: '프레스센터 주차장', distance: '도보 5분', available: 12, price: '10분 700원', safe: true },
-        { name: '세종문화회관 주차장', distance: '도보 7분', available: 45, price: '10분 600원', safe: true },
-      ];
-    } else if (userText.includes('무료')) {
-      response = '주변 무료 주차 가능 공간입니다.\n\n무료 주차는 시간 제한이 있으니 참고해 주세요.';
-      recommendations = [
-        { name: '을지로 노상주차장', distance: '도보 4분', available: 8, price: '30분 무료', safe: true },
-        { name: '청계천 공영주차장', distance: '도보 8분', available: 15, price: '1시간 무료', safe: true },
-      ];
-    } else if (userText.includes('단속') || userText.includes('안전')) {
-      response = '현재 위치 기준 단속 현황입니다.\n\n반경 500m 내 단속카메라 3개가 확인됩니다. 아래 안전한 주차장을 이용해 주세요.';
-      recommendations = [
-        { name: '명동 공영주차장', distance: '도보 6분', available: 32, price: '10분 600원', safe: true },
-        { name: '롯데백화점 주차장', distance: '도보 4분', available: 120, price: '10분 800원', safe: true },
-      ];
-    } else {
-      response = '주변 주차장을 분석했습니다.\n\n현재 위치 기준 가장 가까운 안전한 주차장입니다.';
-      recommendations = [
-        { name: '가까운 공영주차장', distance: '도보 5분', available: 18, price: '10분 500원', safe: true },
-      ];
+      let displayText;
+      if (error.message?.includes('GPT API')) {
+        // 상세 에러 내용 표시 (디버깅용)
+        const detail = error.message.replace('GPT API ', '');
+        displayText = `AI 서비스 연결 오류가 발생했습니다.\n(${detail})\n잠시 후 다시 시도해주세요.`;
+      } else if (error.message?.includes('위치')) {
+        displayText = error.message;
+      } else {
+        displayText = error.message || '요청을 처리하지 못했습니다.';
+      }
+
+      const errorMessage = {
+        id: Date.now() + 1,
+        type: 'ai',
+        text: displayText,
+        time: '방금',
+      };
+      setMessages(prev => [...prev, errorMessage]);
     }
-
-    return {
-      id: messages.length + 2,
-      type: 'ai',
-      text: response,
-      recommendations: recommendations,
-      time: '방금',
-    };
   };
+
+  // sendMessageRef를 항상 최신 sendMessage로 동기화
+  sendMessageRef.current = sendMessage;
 
   const renderMessage = ({ item }) => {
     if (item.type === 'user') {
@@ -222,14 +604,40 @@ export default function AIAssistantScreen({ navigation }) {
     return (
       <View style={styles.aiMessageContainer}>
         <View style={styles.aiAvatar}>
-          <Ionicons name="sparkles" size={20} color="#fff" />
+          <Ionicons name="navigate" size={20} color="#fff" />
         </View>
         <View style={styles.aiMessageContent}>
           <View style={styles.aiMessage}>
             <Text style={styles.aiMessageText}>{item.text}</Text>
           </View>
           
-          {/* 주차장 추천 카드들 */}
+          {/* 경로 안내 카드 */}
+          {item.routeInfo && item.routeInfo.distance != null && (
+            <View style={styles.routeInfoCard}>
+              <View style={styles.routeInfoHeader}>
+                <MaterialIcons name="directions-car" size={18} color="#007AFF" />
+                <Text style={styles.routeInfoTitle}>{item.routeInfo.destName} 경로</Text>
+              </View>
+              {item.routeInfo.waypointNames?.length > 0 && (
+                <View style={styles.routeInfoItem}>
+                  <Ionicons name="flag-outline" size={14} color="#FF9500" />
+                  <Text style={styles.routeInfoText}>경유: {item.routeInfo.waypointNames.join(' → ')}</Text>
+                </View>
+              )}
+              <View style={styles.routeInfoDetails}>
+                <View style={styles.routeInfoItem}>
+                  <Ionicons name="speedometer-outline" size={14} color="#666" />
+                  <Text style={styles.routeInfoText}>{formatDistMeters(item.routeInfo.distance)}</Text>
+                </View>
+                <View style={styles.routeInfoItem}>
+                  <Ionicons name="time-outline" size={14} color="#666" />
+                  <Text style={styles.routeInfoText}>약 {Math.round(item.routeInfo.duration / 60)}분</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* 주차장 추천 카드*/}
           {item.recommendations && (
             <View style={styles.recommendationsContainer}>
               {item.recommendations.map((rec, index) => (
@@ -237,27 +645,41 @@ export default function AIAssistantScreen({ navigation }) {
                   <View style={styles.recHeader}>
                     <FontAwesome5 name="parking" size={16} color="#34C759" />
                     <Text style={styles.recName}>{rec.name}</Text>
-                    {rec.safe && (
-                      <View style={styles.safeBadge}>
-                        <Ionicons name="shield-checkmark" size={12} color="#34C759" />
-                      </View>
-                    )}
                   </View>
                   <View style={styles.recDetails}>
                     <View style={styles.recDetailItem}>
                       <Ionicons name="location-outline" size={14} color="#666" />
                       <Text style={styles.recDetail}>{rec.distance}</Text>
                     </View>
-                    <View style={styles.recDetailItem}>
-                      <Ionicons name="car-outline" size={14} color="#666" />
-                      <Text style={styles.recDetail}>{rec.available}자리</Text>
-                    </View>
-                    <View style={styles.recDetailItem}>
-                      <Ionicons name="card-outline" size={14} color="#666" />
-                      <Text style={styles.recDetail}>{rec.price}</Text>
-                    </View>
+                    {rec.available !== null && rec.available !== undefined && (
+                      <View style={styles.recDetailItem}>
+                        <Ionicons name="car-outline" size={14} color="#666" />
+                        <Text style={styles.recDetail}>{rec.available}자리</Text>
+                      </View>
+                    )}
+                    {!!rec.price && (
+                      <View style={styles.recDetailItem}>
+                        <Ionicons name="card-outline" size={14} color="#666" />
+                        <Text style={styles.recDetail}>{rec.price}</Text>
+                      </View>
+                    )}
                   </View>
-                  <TouchableOpacity style={styles.navigateButton}>
+                  <TouchableOpacity 
+                    style={styles.navigateButton}
+                    onPress={async () => {
+                      try {
+                        const loc = await ensureLocation();
+                        await startKNSDKNavi(
+                          rec.lat, rec.lng, rec.name,
+                          loc.latitude, loc.longitude,
+                        );
+                      } catch (err) {
+                        console.log('카드 내비 시작 실패:', err);
+                        emit('navigateToDestination', { name: rec.name, lat: rec.lat, lng: rec.lng });
+                        navigation.navigate('HomeTab');
+                      }
+                    }}
+                  >
                     <MaterialIcons name="directions" size={18} color="#fff" />
                     <Text style={styles.navigateButtonText}>경로 안내</Text>
                   </TouchableOpacity>
@@ -281,17 +703,40 @@ export default function AIAssistantScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
-          <Text style={styles.title}>AI 주차 도우미</Text>
-          <View style={styles.statusBadge}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>온라인</Text>
+          <Text style={styles.title}>SafeParking AI</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.statusBadge}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>온라인</Text>
+            </View>
+            {wakeWordMode && (
+              <View style={[styles.statusBadge, { backgroundColor: conversationMode ? '#E8F5E9' : '#FFF3E0', marginLeft: 6 }]}>
+                <MaterialIcons name="record-voice-over" size={10} color={conversationMode ? '#4CAF50' : '#FF9500'} />
+                <Text style={[styles.statusText, { color: conversationMode ? '#4CAF50' : '#FF9500' }]}>
+                  {conversationMode ? '대화 중' : '"파키야" 대기'}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
-        <TouchableOpacity style={styles.headerButton}>
-          <Ionicons name="ellipsis-vertical" size={24} color="#000" />
+        <TouchableOpacity 
+          style={[styles.headerButton, wakeWordMode && styles.wakeWordHeaderBtnActive]}
+          onPress={toggleWakeWordMode}
+          onLongPress={() => Alert.alert('호출어 안내', '"파키야"라고 부르면 자동으로 음성 인식이 시작됩니다.\n\n예시: "파키야 근처 공영주차장 찾아줘"')}
+        >
+          <MaterialIcons 
+            name="record-voice-over" 
+            size={22} 
+            color={wakeWordMode ? "#FF9500" : "#666"} 
+          />
         </TouchableOpacity>
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
       {/* 메시지 리스트 */}
       <FlatList
         ref={flatListRef}
@@ -307,7 +752,7 @@ export default function AIAssistantScreen({ navigation }) {
                 <Ionicons name="sparkles" size={20} color="#fff" />
               </View>
               <View style={styles.typingBubble}>
-                <Text style={styles.typingText}>입력 중...</Text>
+                <Text style={styles.typingText}>입력 중..</Text>
               </View>
             </View>
           ) : null
@@ -333,9 +778,6 @@ export default function AIAssistantScreen({ navigation }) {
       )}
 
       {/* 입력창 */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
         <View style={styles.inputContainer}>
           {/* 음성/TTS 토글 */}
           <TouchableOpacity 
@@ -355,7 +797,7 @@ export default function AIAssistantScreen({ navigation }) {
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
-              placeholder="메시지를 입력하세요..."
+              placeholder="메시지를 입력하세요.."
               placeholderTextColor="#999"
               value={inputText}
               onChangeText={setInputText}
@@ -365,7 +807,7 @@ export default function AIAssistantScreen({ navigation }) {
             {/* 마이크 버튼 */}
             <TouchableOpacity 
               style={styles.micButton}
-              onPress={startVoiceInput}
+              onPress={startVoiceInputReal}
             >
               <Ionicons name="mic" size={22} color="#27AE60" />
             </TouchableOpacity>
@@ -393,12 +835,12 @@ export default function AIAssistantScreen({ navigation }) {
         visible={voiceModalVisible}
         animationType="fade"
         transparent={true}
-        onRequestClose={cancelVoiceInput}
+        onRequestClose={cancelVoiceInputReal}
       >
         <View style={styles.voiceModalOverlay}>
           <View style={styles.voiceModalContent}>
             <Text style={styles.voiceModalTitle}>
-              {isListening ? '듣고 있습니다...' : '인식 중...'}
+              {isListening ? '듣고 있습니다...' : '인식 중..'}
             </Text>
             <Text style={styles.voiceModalSubtitle}>
               목적지나 조건을 말씀해 주세요
@@ -446,7 +888,7 @@ export default function AIAssistantScreen({ navigation }) {
             {/* 취소 버튼 */}
             <TouchableOpacity 
               style={styles.cancelVoiceButton}
-              onPress={cancelVoiceInput}
+              onPress={cancelVoiceInputReal}
             >
               <Text style={styles.cancelVoiceText}>취소</Text>
             </TouchableOpacity>
@@ -454,9 +896,9 @@ export default function AIAssistantScreen({ navigation }) {
             {/* 예시 문구 */}
             <View style={styles.voiceExamples}>
               <Text style={styles.voiceExampleTitle}>이렇게 말해보세요</Text>
-              <Text style={styles.voiceExampleText}>"강남역 근처 30분 주차할 곳"</Text>
+              <Text style={styles.voiceExampleText}>"강남역 근처 30분 주차장 찾아줘"</Text>
               <Text style={styles.voiceExampleText}>"여기서 가까운 무료 주차장"</Text>
-              <Text style={styles.voiceExampleText}>"단속 없는 안전한 곳으로 안내해"</Text>
+              <Text style={styles.voiceExampleText}>"단속 없는 안전한 곳으로 안내해줘"</Text>
             </View>
           </View>
         </View>
@@ -469,7 +911,7 @@ export default function AIAssistantScreen({ navigation }) {
           onPress={stopSpeaking}
         >
           <Ionicons name="volume-high" size={16} color="#fff" />
-          <Text style={styles.speakingText}>재생 중... 탭하여 중지</Text>
+          <Text style={styles.speakingText}>재생 중.. 탭하면 중지</Text>
         </TouchableOpacity>
       )}
     </SafeAreaView>
@@ -485,7 +927,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    // paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 16,
+    paddingBottom: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -521,9 +965,15 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 4,
   },
+  wakeWordHeaderBtnActive: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#FF9500',
+  },
   messagesList: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 16,
   },
   userMessageContainer: {
     alignItems: 'flex-end',
@@ -638,6 +1088,39 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontSize: 14,
   },
+  routeInfoCard: {
+    backgroundColor: '#EBF5FF',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#007AFF',
+  },
+  routeInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  routeInfoTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#007AFF',
+    marginLeft: 6,
+  },
+  routeInfoDetails: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  routeInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  routeInfoText: {
+    fontSize: 13,
+    color: '#333',
+    marginLeft: 4,
+    fontWeight: '600',
+  },
   typingContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -688,10 +1171,12 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 10,
+    paddingTop: 6,
+    paddingBottom: 6,
     backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e0e0e0',
   },
   voiceToggle: {
     width: 40,
@@ -705,35 +1190,40 @@ const styles = StyleSheet.create({
   voiceToggleActive: {
     backgroundColor: '#E8F8EE',
   },
+  wakeWordActive: {
+    backgroundColor: '#FFF3E0',
+    borderWidth: 1.5,
+    borderColor: '#FF9500',
+  },
   inputWrapper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-end',
     backgroundColor: '#F5F5F5',
-    borderRadius: 24,
-    paddingLeft: 16,
+    borderRadius: 22,
+    paddingLeft: 14,
     paddingRight: 4,
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     maxHeight: 100,
-    paddingVertical: 10,
+    paddingVertical: 8,
     color: '#000',
   },
   micButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 2,
+  },
+  sendButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 4,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     backgroundColor: '#E0E0E0',
     justifyContent: 'center',
     alignItems: 'center',
@@ -855,3 +1345,10 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
+
+
+
+
+
+
+
